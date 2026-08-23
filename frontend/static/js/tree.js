@@ -301,32 +301,33 @@ async function initTree() {
             }
             openNoteInTab(id);
         },
-        /* GUI-4 drag & drop (Wunderbaum dnd extension). The server is the
-           hierarchy authority — client checks here are only for fast,
-           clear feedback; invalid moves still fail server-side. */
+        /* GUI-4 drag & drop (Wunderbaum dnd extension — native HTML5 DnD).
+           Per docs: dragStart and dragEnter MUST be implemented to enable
+           dragging/dropping; drop receives e.sourceNode, e.node (target),
+           e.region and e.suggestedDropMode. The server remains the hierarchy
+           authority — client checks are fast feedback only. */
         dnd: {
             autoExpandMS: 400,
             preventVoidMoves: true,
             preventRecursiveMoves: true,
+            dropEffectDefault: "move",
             dragStart: (e) => !!e.sourceNode,
-            dragOver: (e) => {
-                try {
-                    const s = e.sourceNode, t = e.targetNode;
-                    if (!s || !t || String(s.key) === String(t.key)) return false;
-                    if (isDescendantOf(t.key, s.key)) return false; // own subtree
-                    return true; // accept over/before/after; resolved in drop
-                } catch (err) { return false; }
+            dragEnter: (e) => {
+                const s = e.sourceNode, t = e.node;
+                if (!s || !t || String(s.key) === String(t.key)) return false;
+                if (isDescendantOf(t.key, s.key)) return false; // own subtree
+                return true; // allow all regions; exact semantics resolved in drop
             },
             drop: async (e) => {
                 try {
-                    const s = e.sourceNode, t = e.targetNode;
+                    const s = e.sourceNode, t = e.node;
                     if (!s || !t || String(s.key) === String(t.key)) return;
-                    const region = e.region || 'over';
                     if (isDescendantOf(t.key, s.key)) {
                         showToast('Cannot move a note into its own subtree', 'error');
                         return;
                     }
-                    if (region === 'over') {
+                    const mode = e.suggestedDropMode || 'appendChild';
+                    if (mode === 'appendChild') {
                         await moveNoteFlow(Number(s.key), Number(t.key), 9999); // last child
                     } else {
                         // Reorder relative to the target among its siblings
@@ -334,7 +335,7 @@ async function initTree() {
                         if (!meta) return;
                         const sibs = liveSiblings(meta);
                         const tIdx = sibs.findIndex((x) => x.id === Number(t.key));
-                        const pos = region === 'before'
+                        const pos = mode === 'before'
                             ? (sibs[tIdx]?.position ?? tIdx)
                             : (sibs[tIdx + 1]?.position ?? ((sibs[tIdx]?.position ?? tIdx) + 1));
                         await moveNoteFlow(Number(s.key), meta.parent_id, pos);
