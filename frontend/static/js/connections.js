@@ -42,9 +42,12 @@ function render(providers) {
 
 async function refresh() {
   try {
-    render(await (await fetch("/api/connections")).json());
+    const r = await fetch("/api/connections");
+    if (!r.ok) throw new Error(`HTTP ${r.status} from /api/connections`);
+    render(await r.json());
   } catch (e) {
-    $("providerGrid").innerHTML = "<p class='conn-sub'>Failed to load connections.</p>";
+    $("providerGrid").innerHTML =
+      `<p class='conn-sub'>Failed to load connections: ${e.message}. Is the server running?</p>`;
   }
 }
 
