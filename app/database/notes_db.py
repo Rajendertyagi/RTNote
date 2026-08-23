@@ -5,10 +5,13 @@ Connection discipline (root-cause fix for the lock-cascade bug):
   success, rollback on error, and close in every case. A connection that
   dies mid-transaction otherwise holds the write lock forever.
 """
+import logging
 import sqlite3
 from contextlib import contextmanager
 
 from app.config import NOTES_DB_PATH
+
+log = logging.getLogger(__name__)
 
 # Canonical FTS sync triggers — the documented external-content pattern
 # from https://www.sqlite.org/fts5.html §4.4.3. UPDATE is NOT a valid
@@ -84,3 +87,4 @@ def init_db():
             name = ddl.split("TRIGGER ")[1].split(" ")[0]
             conn.execute(f"DROP TRIGGER IF EXISTS {name}")
             conn.execute(ddl)
+    log.info("notes database initialized")

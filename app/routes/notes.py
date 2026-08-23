@@ -7,6 +7,7 @@ whole subtree with `deleted_at` + a shared `delete_id` (restorable via
 All handlers use `with db() as conn:` — commit/rollback/close guaranteed,
 so no failed request can ever leak a lock.
 """
+import logging
 import secrets
 from datetime import datetime
 
@@ -14,6 +15,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
 from app.database.notes_db import db
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["notes"])
 
@@ -115,6 +118,7 @@ async def create_note(data: dict):
         )
         note_id = cursor.lastrowid
         row = conn.execute("SELECT * FROM notes WHERE id = ?", (note_id,)).fetchone()
+    log.info("note created id=%s type=%s", note_id, note_type)
     return _note_dict(row)
 
 
@@ -208,6 +212,7 @@ async def delete_note(note_id: int):
             [now, delete_id] + ids,
         )
         conn.execute(f"DELETE FROM bookmarks WHERE note_id IN ({placeholders})", ids)
+    log.info("note soft-deleted id=%s subtree=%d delete_id=%s", note_id, len(ids), delete_id)
     return {"deleted": True, "count": len(ids), "delete_id": delete_id}
 
 
@@ -225,6 +230,10 @@ async def search_notes(q: str):
                 (q,),
             ).fetchall()
         except Exception:
+            # FTS5 MATCH can choke on odd query syntax (unbalanced quotes,
+            # bare operators) — fall back to a plain LIKE scan so search
+            # degrades instead of erroring.
+            log.warning("FTS MATCH failed for query, falling back to LIKE scan")
             rows = conn.execute(
                 "SELECT id, title, content, NULL AS snip FROM notes "
                 "WHERE deleted_at IS NULL AND (title LIKE ? OR content LIKE ?)",

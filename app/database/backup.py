@@ -56,6 +56,7 @@ def backup_now() -> Path | None:
         # %f (microseconds) keeps rapid successive backups from colliding
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         dest_path = BACKUP_DIR / f"notes-{stamp}.db"
+        log.info("backup started")
 
         src = sqlite3.connect(NOTES_DB_PATH)
         try:
@@ -69,7 +70,9 @@ def backup_now() -> Path | None:
             src.close()
 
         _apply_retention()
-        log.info("Backup written: %s", dest_path)
+        log.info(
+            "backup completed path=%s size=%d", dest_path, dest_path.stat().st_size
+        )
         return dest_path
     except Exception:
         log.exception("Database backup FAILED — notes are running unguarded "

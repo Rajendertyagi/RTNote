@@ -16,6 +16,21 @@ const App = {
     bookmarkList: [],       // ordered bookmark rows for the strip
 };
 
+/* Correlate browser logs with the backend request that produced them:
+   every API response carries X-Request-ID (see main.py middleware);
+   remember the latest one for RTWLog's [id] prefix. */
+const _origFetch = window.fetch.bind(window);
+window.fetch = async (...args) => {
+    const r = await _origFetch(...args);
+    try {
+        if (window.RTWLog && r.headers) {
+            const rid = r.headers.get('X-Request-ID');
+            if (rid) window.RTWLog.setRequestId(rid);
+        }
+    } catch (e) { /* opaque responses etc. — never break a request */ }
+    return r;
+};
+
 /* ── Notes ── */
 async function apiListNotes() {
     const r = await fetch('/api/notes');

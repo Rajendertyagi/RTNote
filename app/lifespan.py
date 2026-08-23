@@ -27,11 +27,14 @@ async def _backup_loop():
 
 @asynccontextmanager
 async def lifespan(app):
+    log.info("application starting")
     init_notes_db()
     run_migrations()
     await init_chat_db()
     backup_if_due()  # snapshot at startup if the last one is stale
     task = asyncio.create_task(_backup_loop())
+    log.info("application started")
     yield
     task.cancel()
     await dispose_engine()
+    log.info("application stopped")

@@ -4,9 +4,13 @@ Mirrors Trilium: deletion is reversible until erasure. A restore brings back
 the whole delete-group (the subtree deleted together); if the restored root's
 old parent chain is itself in the trash, the note is re-parented to top level.
 """
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from app.database.notes_db import db
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/trash", tags=["trash"])
 
@@ -87,4 +91,5 @@ async def empty_trash():
             conn.execute(f"DELETE FROM attachments WHERE note_id IN ({placeholders})", all_ids)
             conn.execute(f"DELETE FROM bookmarks WHERE note_id IN ({placeholders})", all_ids)
             conn.execute(f"DELETE FROM notes WHERE id IN ({placeholders})", all_ids)
+    log.info("trash emptied: erased %d notes (incl. attachments/bookmarks)", len(all_ids))
     return {"erased": len(all_ids)}

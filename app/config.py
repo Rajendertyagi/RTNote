@@ -23,6 +23,11 @@ CHAT_DATABASE_URL = os.getenv(
 # Provider API keys / base URLs (never committed — data/ is gitignored).
 CONNECTIONS_PATH = Path(os.getenv("CONNECTIONS_PATH", str(DATA_DIR / "connections.json")))
 
+# Logging (see app/core/logging.py and docs/LOGGING.md)
+LOG_DIR = Path(os.getenv("LOG_DIR", str(DATA_DIR / "logs")))
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_RETENTION = int(os.getenv("LOG_RETENTION", "5"))  # rotated files kept per log
+
 # How many recent messages (incl. system prompt) are sent to the LLM per turn.
 # Full history stays in the DB/UI; only the wire payload is trimmed.
 CHAT_HISTORY_LIMIT = int(os.getenv("CHAT_HISTORY_LIMIT", "20"))

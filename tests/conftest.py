@@ -12,6 +12,8 @@ os.environ["CHAT_DATABASE_URL"] = (
     "sqlite+aiosqlite:///" + os.path.join(_TMP_DIR, "chat.db").replace("\\", "/")
 )
 os.environ["CONNECTIONS_PATH"] = os.path.join(_TMP_DIR, "connections.json")
+# App logs go to the temp dir too (main.py configures logging at import)
+os.environ["LOG_DIR"] = os.path.join(_TMP_DIR, "logs")
 
 import pytest
 import pytest_asyncio

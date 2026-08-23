@@ -6,6 +6,8 @@ inline for known image mimes, attachment-disposition otherwise.
 """
 from urllib.parse import unquote
 
+import logging
+
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import Response
 
@@ -60,6 +62,9 @@ async def upload_attachment(note_id: int, file: UploadFile):
 
     inline = mime in INLINE_MIMES
     url = f"/api/attachments/{att_id}/image" if inline else f"/api/attachments/{att_id}/download"
+    logging.getLogger(__name__).info(
+        "attachment uploaded id=%s note_id=%s size=%d inline=%s", att_id, note_id, len(data), inline
+    )
     return {"id": att_id, "filename": filename, "mime": mime,
             "size": len(data), "url": url, "inline": inline}
 
