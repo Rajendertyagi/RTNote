@@ -74,6 +74,23 @@ async function apiDuplicateNote(id) {
     return r.json();
 }
 
+/* GUI-4: move/reorder a note. parent_id null = root level; position is the
+   0-based insert index among the destination's live siblings (server clamps
+   and validates hierarchy invariants). */
+async function apiMoveNote(id, parentId, position) {
+    const r = await fetch('/api/notes/' + id + '/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parent_id: parentId, position: position }),
+    });
+    if (!r.ok) {
+        let msg = 'Move failed (' + r.status + ')';
+        try { msg = (await r.json()).detail || msg; } catch (e) { /* keep default */ }
+        throw new Error(msg);
+    }
+    return r.json();
+}
+
 async function apiSearch(q) {
     const r = await fetch('/api/search?q=' + encodeURIComponent(q));
     return r.json();

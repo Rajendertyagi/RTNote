@@ -307,6 +307,67 @@ function initNavigation() {
     navUpdateButtons();
 }
 
+/* ── Move-to dialog (GUI-4): simple destination picker ── */
+let _moveDialogNoteId = null;
+
+function openMoveDialog(noteId) {
+    const overlay = document.getElementById('moveModal');
+    const sel = document.getElementById('moveDestSelect');
+    if (!overlay || !sel) return;
+    _moveDialogNoteId = Number(noteId);
+
+    // Candidate destinations: every note except the moved note and its own
+    // descendants (server rejects those anyway — this keeps the list honest).
+    const byId = new Map(_notesCache.map((n) => [n.id, n]));
+    const excluded = new Set([_moveDialogNoteId]);
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const n of _notesCache) {
+            if (excluded.has(n.id)) continue;
+            if (n.parent_id != null && excluded.has(n.parent_id)) {
+                excluded.add(n.id);
+                changed = true;
+            }
+        }
+    }
+
+    const depth = (id) => {
+        let d = 0, cur = byId.get(id);
+        while (cur && cur.parent_id != null) { d++; cur = byId.get(cur.parent_id); }
+        return d;
+    };
+
+    sel.innerHTML = '<option value="">(top level)</option>' + _notesCache
+        .filter((n) => !excluded.has(n.id))
+        .sort((x, y) => x.id - y.id)
+        .map((n) => {
+            const label = '— '.repeat(depth(n.id)) + n.title;
+            return `<option value="${n.id}">${escapeHtml(label)}</option>`;
+        })
+        .join('');
+    overlay.classList.remove('hidden');
+}
+
+function initMoveDialog() {
+    const overlay = document.getElementById('moveModal');
+    if (!overlay) return;
+    const close = () => { overlay.classList.add('hidden'); _moveDialogNoteId = null; };
+    document.getElementById('moveCancel').addEventListener('click', close);
+    overlay.addEventListener('click', function (e) { if (e.target === this) close(); });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !overlay.classList.contains('hidden')) close();
+    });
+    document.getElementById('moveConfirm').addEventListener('click', async () => {
+        const sel = document.getElementById('moveDestSelect');
+        const parent = sel.value === '' ? null : Number(sel.value);
+        const noteId = _moveDialogNoteId;
+        close();
+        if (noteId == null) return;
+        await moveNoteFlow(noteId, parent, 9999); // append as last child of destination
+    });
+}
+
 /* ── New Note type picker (topbar + button) ── */
 function initNewNoteMenu() {
     const btn = document.getElementById('newNoteBtn');
@@ -409,6 +470,10 @@ const CTX_MENU_HTML =
     '<div class="context-menu-item" data-action="rename"><i class="bx bx-edit icon"></i> Rename <span class="shortcut">F2</span></div>' +
     '<div class="context-menu-item" data-action="duplicate"><i class="bx bx-copy icon"></i> Duplicate</div>' +
     '<div class="context-menu-sep"></div>' +
+    '<div class="context-menu-item" data-action="move-up"><i class="bx bx-arrow-to-top icon"></i> Move up <span class="shortcut">Ctrl+↑</span></div>' +
+    '<div class="context-menu-item" data-action="move-down"><i class="bx bx-arrow-to-bottom icon"></i> Move down <span class="shortcut">Ctrl+↓</span></div>' +
+    '<div class="context-menu-item" data-action="move-to"><i class="bx bx-transfer icon"></i> Move to…</div>' +
+    '<div class="context-menu-sep"></div>' +
     '<div class="context-menu-item" data-action="bookmark"><i class="bx bx-bookmark-star icon"></i> <span id="ctx-bookmark-label">Bookmark</span></div>' +
     '<div class="context-menu-sep"></div>' +
     '<div class="context-menu-item danger" data-action="delete"><i class="bx bx-trash icon"></i> Delete</div>';
@@ -499,7 +564,13 @@ function initContextMenu() {
         const tree = mar10.Wunderbaum.getTree('note-tree');
         if (tree) { try { node = tree.findKey(String(ctxNodeId)); } catch (err) { /* ignore */ } }
 
-        if (action === 'new-child') {
+        if (action === 'move-up') {
+            await treeMoveRelative(ctxNodeId, -1);
+        } else if (action === 'move-down') {
+            await treeMoveRelative(ctxNodeId, 1);
+        } else if (action === 'move-to') {
+            openMoveDialog(ctxNodeId);
+        } else if (action === 'new-child') {
             const n = await apiCreateNote('New Note', ctxNodeId);
             await refreshTree();
             await openNoteInTab(n.id);

@@ -69,7 +69,112 @@ def _note_dict(n) -> dict:
         "mime": n["mime"] if "mime" in keys else None,
         "start_date": n["start_date"] if "start_date" in keys else None,
         "end_date": n["end_date"] if "end_date" in keys else None,
+        "position": n["position"] if "position" in keys else None,
     }
+
+
+def _live_siblings(conn, parent_id, exclude_id=None):
+    """Live siblings of a parent (parent_id may be NULL = root), ordered by
+    the deterministic sibling order: explicit position, then id."""
+    rows = conn.execute(
+        "SELECT id, position FROM notes "
+        "WHERE parent_id IS ? AND deleted_at IS NULL AND id != ? "
+        "ORDER BY COALESCE(position, id), id",
+        (parent_id, exclude_id if exclude_id is not None else -1),
+    ).fetchall()
+    return [r["id"] for r in rows]
+
+
+def _is_ancestor(conn, ancestor_id, note_id):
+    """True when ancestor_id lies on note_id's parent chain."""
+    cur = note_id
+    guard = 0
+    while cur is not None and guard < 10000:
+        if cur == ancestor_id:
+            return True
+        row = conn.execute("SELECT parent_id FROM notes WHERE id=?", (cur,)).fetchone()
+        cur = row["parent_id"] if row else None
+        guard += 1
+    return False
+
+
+@router.post("/notes/{note_id}/move")
+async def move_note(note_id: int, data: dict):
+    """Move/reorder a note (GUI-4).
+
+    Body: {"parent_id": int|null, "position": int}
+    - parent_id null = root level
+    - position = 0-based insert index among the destination's live siblings
+      (clamped to range)
+
+    Validates self-parent, cycles, destination existence and deleted
+    destination; renumbers affected sibling sets atomically. Subtree moves
+    need no child updates — children keep their parent_id pointing at the
+    moved note.
+    """
+    new_parent = data.get("parent_id")
+    position = data.get("position")
+
+    if not isinstance(position, int) or isinstance(position, bool) or position < 0:
+        raise HTTPException(status_code=400, detail="Invalid position")
+    if new_parent is not None and not isinstance(new_parent, int):
+        raise HTTPException(status_code=400, detail="Invalid parent_id")
+
+    with db() as conn:
+        note = conn.execute(
+            "SELECT * FROM notes WHERE id=? AND deleted_at IS NULL", (note_id,)
+        ).fetchone()
+        if not note:
+            raise HTTPException(status_code=404, detail="Note not found")
+
+        old_parent = note["parent_id"]
+
+        if new_parent == note_id:
+            raise HTTPException(status_code=400, detail="A note cannot be its own parent")
+
+        if new_parent is not None:
+            parent_row = conn.execute(
+                "SELECT id FROM notes WHERE id=? AND deleted_at IS NULL", (new_parent,)
+            ).fetchone()
+            if not parent_row:
+                raise HTTPException(status_code=400, detail="Destination parent does not exist or is deleted")
+            # Cycle check: walking up from the destination must never reach
+            # the note being moved.
+            if _is_ancestor(conn, note_id, new_parent):
+                raise HTTPException(status_code=400, detail="Cannot move a note into its own subtree")
+
+        if new_parent == old_parent:
+            # Reorder within the same parent: remove self, reinsert at index.
+            siblings = _live_siblings(conn, old_parent, exclude_id=note_id)
+            pos = min(position, len(siblings))
+            final = siblings[:pos] + [note_id] + siblings[pos:]
+            conn.execute(
+                "UPDATE notes SET position=? WHERE id=?", (pos, note_id)
+            )
+            for i, sid in enumerate(final):
+                if sid != note_id:
+                    conn.execute("UPDATE notes SET position=? WHERE id=?", (i, sid))
+        else:
+            old_siblings = _live_siblings(conn, old_parent, exclude_id=note_id)
+            new_siblings = _live_siblings(conn, new_parent, exclude_id=None)
+            pos = min(position, len(new_siblings))
+            final_new = new_siblings[:pos] + [note_id] + new_siblings[pos:]
+            conn.execute(
+                "UPDATE notes SET parent_id=?, position=? WHERE id=?", (new_parent, pos, note_id)
+            )
+            for i, sid in enumerate(old_siblings):
+                conn.execute("UPDATE notes SET position=? WHERE id=?", (i, sid))
+            for i, sid in enumerate(final_new):
+                if sid != note_id:
+                    conn.execute("UPDATE notes SET position=? WHERE id=?", (i, sid))
+
+        row = conn.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
+
+    log.info(
+        "note moved id=%s parent=%s->%s position=%s",
+        note_id, old_parent, new_parent, position,
+    )
+    return _note_dict(row)
 
 
 def _subtree_ids(conn, root_id: int) -> list[int]:
@@ -117,6 +222,13 @@ async def create_note(data: dict):
             ),
         )
         note_id = cursor.lastrowid
+        # New notes append after their live siblings (GUI-4 sibling order)
+        conn.execute(
+            "UPDATE notes SET position="
+            "(SELECT COUNT(*) FROM notes c2 WHERE c2.parent_id IS notes.parent_id AND c2.id != notes.id) "
+            "WHERE id=?",
+            (note_id,),
+        )
         row = conn.execute("SELECT * FROM notes WHERE id = ?", (note_id,)).fetchone()
     log.info("note created id=%s type=%s", note_id, note_type)
     return _note_dict(row)

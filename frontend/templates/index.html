@@ -250,6 +250,19 @@
             </div>
         </div>
 
+        <!-- Move-to dialog (GUI-4) -->
+        <div class="modal-overlay hidden" id="moveModal" data-testid="move-modal">
+            <div class="modal">
+                <h3>Move note</h3>
+                <label>Destination parent</label>
+                <select id="moveDestSelect" data-testid="move-dest"></select>
+                <div class="modal__actions">
+                    <button class="btn-sm" id="moveCancel">Cancel</button>
+                    <button class="btn-sm primary" id="moveConfirm" data-testid="move-confirm">Move</button>
+                </div>
+            </div>
+        </div>
+
         <div class="context-menu" id="ctxMenu"></div>
     <div class="context-menu" id="newNoteMenu">
         <div class="context-menu-item" data-type="text"><i class='bx bx-file icon'></i> Text note</div>
@@ -265,7 +278,7 @@
     <script src="/static/js/logger.js?v=1"></script>
     <script src="/static/js/chat-core.js?v=3"></script>
     <script src="/static/js/history.js?v=2"></script>
-    <script src="/static/js/api.js?v=21"></script>
+    <script src="/static/js/api.js?v=22"></script>
     <script src="/static/js/ui.js?v=22"></script>
     <script src="/static/js/tree.js?v=22"></script>
     <script src="/static/js/editor.js?v=22"></script>

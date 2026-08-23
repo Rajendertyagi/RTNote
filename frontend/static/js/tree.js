@@ -21,7 +21,11 @@ function buildTreeSource(notes) {
     });
 
     function toNodes(parentId) {
-        const children = byParent.get(parentId) || [];
+        // Deterministic sibling order: explicit position, then id (matches
+        // the backend's COALESCE(position, id) contract).
+        const children = (byParent.get(parentId) || [])
+            .slice()
+            .sort((a, b) => (a.position ?? a.id) - (b.position ?? b.id));
         return children.map((n) => {
             const kids = toNodes(n.id);
             const isFolder = kids.length > 0;
@@ -31,11 +35,82 @@ function buildTreeSource(notes) {
                 type: isFolder ? 'folder' : 'doc',
                 icon: isFolder ? 'bx bx-folder' : (NOTE_TYPE_ICONS[n.type] || NOTE_TYPE_ICONS.text),
                 expanded: parentId === 'root',
+                position: n.position,
                 children: kids.length ? kids : undefined,
             };
         });
     }
     return toNodes('root');
+}
+
+/* ── GUI-4 hierarchy moves ────────────────────────────────────── */
+
+/* Live siblings of a note's parent (including itself), sorted in display
+   order. Reads _notesCache; the server remains the authority. */
+function liveSiblings(meta) {
+    return _notesCache
+        .filter((n) => n.parent_id === meta.parent_id && !n.deleted_at)
+        .sort((a, b) => (a.position ?? a.id) - (b.position ?? b.id));
+}
+
+function isDescendantOf(descId, ancestorId) {
+    let cur = Number(descId);
+    const byId = new Map(_notesCache.map((n) => [n.id, n]));
+    let guard = 0;
+    while (cur != null && guard++ < 10000) {
+        cur = byId.get(cur)?.parent_id;
+        if (cur == null) return false;
+        if (Number(cur) === Number(ancestorId)) return true;
+    }
+    return false;
+}
+
+/* Single flow for every tree mutation: API → refresh choke point → reveal.
+   Returns true on success; failures surface as a toast (never silent). */
+async function moveNoteFlow(noteId, parentId, position) {
+    try {
+        await apiMoveNote(noteId, parentId, position);
+        await refreshTree();
+        revealNoteInTree(noteId);
+        return true;
+    } catch (err) {
+        showToast(err.message || 'Move failed', 'error');
+        return false;
+    }
+}
+
+/* Ctrl+Up / Ctrl+Down: swap position with the previous/next live sibling. */
+async function treeMoveRelative(noteId, delta) {
+    const meta = _notesCache.find((n) => n.id === Number(noteId));
+    if (!meta) return;
+    const sibs = liveSiblings(meta);
+    const idx = sibs.findIndex((s) => s.id === meta.id);
+    const target = idx + delta;
+    if (target < 0 || target >= sibs.length) return; // edge: first/last sibling
+    await moveNoteFlow(meta.id, meta.parent_id, sibs[target].position ?? target);
+}
+
+/* Ctrl+Left: reparent under the grandparent, right after the old parent. */
+async function treePromote(noteId) {
+    const byId = new Map(_notesCache.map((n) => [n.id, n]));
+    const meta = byId.get(Number(noteId));
+    if (!meta || meta.parent_id == null) return; // already root-level
+    const parent = byId.get(meta.parent_id);
+    if (!parent || parent.parent_id == null) return; // parent is root-level → no grandparent
+    const gpSibs = liveSiblings({ parent_id: parent.parent_id });
+    const parentIdx = gpSibs.findIndex((s) => s.id === parent.id);
+    const pos = parentIdx + 1; // insert directly after the old parent
+    await moveNoteFlow(meta.id, parent.parent_id, gpSibs[pos] ? (gpSibs[pos].position ?? pos) : pos + 1);
+}
+
+/* Ctrl+Right: become the last child of the previous live sibling. */
+async function treeNestIntoPrevSibling(noteId) {
+    const meta = _notesCache.find((n) => n.id === Number(noteId));
+    if (!meta) return;
+    const sibs = liveSiblings(meta);
+    const idx = sibs.findIndex((s) => s.id === meta.id);
+    if (idx <= 0) return; // no previous sibling
+    await moveNoteFlow(meta.id, sibs[idx - 1].id, 9999); // server clamps to last
 }
 
 /* Fetch notes first, then build the tree with a real source — no races */
@@ -142,15 +217,39 @@ async function initTree() {
     // Root-level notes are a no-op; never fires while typing elsewhere
     // because the listener is scoped to the tree container.
     el.addEventListener('keydown', (e) => {
-        if (e.key !== 'Backspace') return;
         const t = mar10.Wunderbaum.getTree('note-tree');
         const node = t && typeof t.getActiveNode === 'function' ? t.getActiveNode() : null;
-        if (!node) return;
-        const id = Number(node.key);
-        const meta = _notesCache.find((n) => n.id === id);
-        if (!meta || meta.parent_id == null) return; // root-level: no-op
-        e.preventDefault();
-        openNoteInTab(meta.parent_id);
+
+        if (e.key === 'Backspace') {
+            if (!node) return;
+            const id = Number(node.key);
+            const meta = _notesCache.find((n) => n.id === id);
+            if (!meta || meta.parent_id == null) return; // root-level: no-op
+            e.preventDefault();
+            openNoteInTab(meta.parent_id);
+            return;
+        }
+
+        /* GUI-4 keyboard tree movement — only with tree focus, so typing in
+           the editor/inputs can never trigger a hierarchy mutation. */
+        if (e.ctrlKey && !e.shiftKey && !e.altKey) {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                if (!node) return;
+                e.preventDefault();
+                e.stopPropagation();
+                treeMoveRelative(Number(node.key), e.key === 'ArrowUp' ? -1 : 1);
+            } else if (e.key === 'ArrowLeft') {
+                if (!node) return;
+                e.preventDefault();
+                e.stopPropagation();
+                treePromote(Number(node.key));
+            } else if (e.key === 'ArrowRight') {
+                if (!node) return;
+                e.preventDefault();
+                e.stopPropagation();
+                treeNestIntoPrevSibling(Number(node.key));
+            }
+        }
     });
 
     new mar10.Wunderbaum({
@@ -160,7 +259,7 @@ async function initTree() {
         checkbox: false,
         selectMode: 1,
         icon: (e) => e.node.data.icon || 'bx bx-file',
-        extensions: ['edit'],
+        extensions: ['edit', 'dnd'],
         edit: {
             trigger: ['F2'],
             applyEdit: async (e) => {
@@ -194,6 +293,49 @@ async function initTree() {
                 return;
             }
             openNoteInTab(id);
+        },
+        /* GUI-4 drag & drop (Wunderbaum dnd extension). The server is the
+           hierarchy authority — client checks here are only for fast,
+           clear feedback; invalid moves still fail server-side. */
+        dnd: {
+            autoExpandMS: 400,
+            preventVoidMoves: true,
+            preventRecursiveMoves: true,
+            dragStart: (e) => !!e.sourceNode,
+            dragOver: (e) => {
+                try {
+                    const s = e.sourceNode, t = e.targetNode;
+                    if (!s || !t || String(s.key) === String(t.key)) return false;
+                    if (isDescendantOf(t.key, s.key)) return false; // own subtree
+                    return true; // accept over/before/after; resolved in drop
+                } catch (err) { return false; }
+            },
+            drop: async (e) => {
+                try {
+                    const s = e.sourceNode, t = e.targetNode;
+                    if (!s || !t || String(s.key) === String(t.key)) return;
+                    const region = e.region || 'over';
+                    if (isDescendantOf(t.key, s.key)) {
+                        showToast('Cannot move a note into its own subtree', 'error');
+                        return;
+                    }
+                    if (region === 'over') {
+                        await moveNoteFlow(Number(s.key), Number(t.key), 9999); // last child
+                    } else {
+                        // Reorder relative to the target among its siblings
+                        const meta = _notesCache.find((n) => n.id === Number(t.key));
+                        if (!meta) return;
+                        const sibs = liveSiblings(meta);
+                        const tIdx = sibs.findIndex((x) => x.id === Number(t.key));
+                        const pos = region === 'before'
+                            ? (sibs[tIdx]?.position ?? tIdx)
+                            : (sibs[tIdx + 1]?.position ?? ((sibs[tIdx]?.position ?? tIdx) + 1));
+                        await moveNoteFlow(Number(s.key), meta.parent_id, pos);
+                    }
+                } catch (err) {
+                    showToast(err.message || 'Move failed', 'error');
+                }
+            },
         },
     });
 }

@@ -130,6 +130,23 @@ def _m008_performance_indexes(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_notes_start ON notes(start_date)")
 
 
+def _m009_note_position(conn):
+    """GUI-4: persisted sibling ordering for tree move/reorder.
+
+    Backfill gives each note a 0-based index among its siblings following
+    the current id order, so existing hierarchies keep their visual order.
+    Rows created before this migration with NULL position sort after
+    positioned siblings via COALESCE(position, id) at read sites."""
+    conn.execute("ALTER TABLE notes ADD COLUMN position INTEGER")
+    conn.execute("""
+        UPDATE notes SET position = (
+            SELECT COUNT(*) FROM notes c2
+            WHERE c2.parent_id IS notes.parent_id AND c2.id < notes.id
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_notes_parent_pos ON notes(parent_id, position)")
+
+
 MIGRATIONS.extend([
     (2, "notes_soft_delete", _m002_notes_soft_delete),
     (3, "options_table", _m003_options_table),
@@ -138,6 +155,7 @@ MIGRATIONS.extend([
     (6, "attachments_table", _m006_attachments_table),
     (7, "fix_fts_triggers", _m007_fix_fts_triggers),
     (8, "performance_indexes", _m008_performance_indexes),
+    (9, "note_position", _m009_note_position),
 ])
 
 
