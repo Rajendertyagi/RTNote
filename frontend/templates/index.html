@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" data-theme="catppuccin-mocha">
 <head>
     <meta charset="UTF-8">
@@ -21,7 +21,7 @@
     <!-- FullCalendar (same library Trilium uses) -->
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
     <!-- Mermaid + MindElixir (P5 rich note types).
-         MindElixir v4 ships only ES modules → import & expose global. -->
+         MindElixir v4 ships only ES modules â†’ import & expose global. -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
     <script type="module">
         import MindElixir from 'https://cdn.jsdelivr.net/npm/mind-elixir@4/dist/MindElixir.min.js';
@@ -29,8 +29,8 @@
     </script>
 
     <!-- App styles -->
-    <link rel="stylesheet" href="/static/css/style.css?v=14">
-    <link rel="stylesheet" href="/static/css/themes.css?v=14">
+    <link rel="stylesheet" href="/static/css/style.css?v=15">
+    <link rel="stylesheet" href="/static/css/themes.css?v=15">
 </head>
 <body>
     <div class="app">
@@ -130,7 +130,7 @@
             </div>
 
             <!-- Custom HTML page view: source (left) + sandboxed live preview (right).
-                 The sandbox WITHOUT allow-same-origin is the security boundary —
+                 The sandbox WITHOUT allow-same-origin is the security boundary â€”
                  pages run scripts/CDN libs but cannot touch app data/DOM. -->
             <div class="type-view hidden" id="view-page">
                 <textarea id="page-src" class="page-src" spellcheck="false"
@@ -166,6 +166,20 @@
                 <div class="tab" data-tab="files" onclick="switchRightTab('files')">Files</div>
             </div>
             <div class="chat-container" id="chat-panel">
+                <div class="chat-mini-toolbar">
+                    <select id="chatModelMini" title="Model"></select>
+                    <select id="chatEffortMini" title="Thinking level">
+                        <option value="">Thinking: off</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                    <button class="qs-action" id="chatAttachMini" title="Attach text file"><i class='bx bx-paperclip'></i></button>
+                    <input type="file" id="chatFileMini" multiple hidden
+                           accept=".txt,.md,.markdown,.csv,.json,.py,.js,.ts,.html,.css,.xml,.yml,.yaml,.log,.sql,.sh,.toml,.ini">
+                    <a href="/chat" target="_blank" class="qs-action" title="Open full chat"><i class='bx bx-expand-alt'></i></a>
+                </div>
+                <div id="chatAttChipsMini" class="chat-att-chips hidden"></div>
                 <div class="chat-messages" id="chat-messages">
                     <div class="message assistant">
                         <div class="message-avatar"><i class='bx bx-bot'></i></div>
@@ -177,7 +191,7 @@
                     <button onclick="sendMessage()"><i class='bx bx-send'></i></button>
                 </div>
             </div>
-            <div class="right-content hidden" id="outline-panel"><div class="empty-state-small">No outline yet — add headings</div></div>
+            <div class="right-content hidden" id="outline-panel"><div class="empty-state-small">No outline yet â€” add headings</div></div>
             <div class="right-content hidden" id="memories-panel"><div class="empty-state-small" id="memories-list">Loading memories...</div></div>
             <div class="right-content hidden" id="files-panel">
                 <div class="files-actions">
@@ -207,12 +221,13 @@
     </div>
     <div class="toast-container" id="toastContainer"></div>
 
-    <!-- App modules (order matters: api → ui → tree → editor → search → main) -->
-    <script src="/static/js/api.js?v=14"></script>
-    <script src="/static/js/ui.js?v=14"></script>
-    <script src="/static/js/tree.js?v=14"></script>
-    <script src="/static/js/editor.js?v=14"></script>
-    <script src="/static/js/search.js?v=14"></script>
-    <script src="/static/js/main.js?v=14"></script>
+    <!-- App modules (order matters: api â†’ ui â†’ tree â†’ editor â†’ search â†’ main) -->
+    <script src="/static/js/api.js?v=15"></script>
+    <script src="/static/js/ui.js?v=15"></script>
+    <script src="/static/js/tree.js?v=15"></script>
+    <script src="/static/js/editor.js?v=15"></script>
+    <script src="/static/js/search.js?v=15"></script>
+    <script src="/static/js/main.js?v=15"></script>
 </body>
 </html>
+

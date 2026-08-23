@@ -709,6 +709,58 @@ function initFiles() {
 /* ── Chat panel ── */
 let chatSessionId = null;
 let isGenerating = false;
+let chatAttachmentsMini = []; // {filename, content}
+const CHAT_TEXT_EXT = /\.(txt|md|markdown|csv|json|py|js|ts|html|css|xml|yml|yaml|log|sql|sh|toml|ini)$/i;
+
+function initChatMiniToolbar() {
+    const modelSel = document.getElementById('chatModelMini');
+    const effortSel = document.getElementById('chatEffortMini');
+    if (!modelSel) return;
+
+    fetch('/api/chat/models').then((r) => r.json()).then((models) => {
+        models.forEach((m) => {
+            const o = document.createElement('option');
+            o.value = m.id;
+            o.textContent = m.name;
+            modelSel.appendChild(o);
+        });
+        const saved = localStorage.getItem('chatModel');
+        if (saved && [...modelSel.options].some((o) => o.value === saved)) modelSel.value = saved;
+    }).catch(() => {});
+
+    modelSel.addEventListener('change', () => localStorage.setItem('chatModel', modelSel.value));
+    effortSel.addEventListener('change', () => localStorage.setItem('chatEffort', effortSel.value));
+    const savedEffort = localStorage.getItem('chatEffort');
+    if (savedEffort) effortSel.value = savedEffort;
+
+    document.getElementById('chatAttachMini').addEventListener('click',
+        () => document.getElementById('chatFileMini').click());
+    document.getElementById('chatFileMini').addEventListener('change', async (e) => {
+        for (const f of e.target.files) {
+            if (!CHAT_TEXT_EXT.test(f.name)) continue;
+            chatAttachmentsMini.push({ filename: f.name, content: (await f.text()).slice(0, 200000) });
+        }
+        e.target.value = '';
+        renderChatAttChips();
+    });
+}
+
+function renderChatAttChips() {
+    const bar = document.getElementById('chatAttChipsMini');
+    if (!bar) return;
+    bar.innerHTML = '';
+    bar.classList.toggle('hidden', !chatAttachmentsMini.length);
+    chatAttachmentsMini.forEach((a) => {
+        const chip = document.createElement('span');
+        chip.className = 'att-chip';
+        chip.innerHTML = escapeHtml(a.filename) + ' <button title="Remove"><i class="bx bx-x"></i></button>';
+        chip.querySelector('button').onclick = () => {
+            chatAttachmentsMini = chatAttachmentsMini.filter((v) => v !== a);
+            renderChatAttChips();
+        };
+        bar.appendChild(chip);
+    });
+}
 
 function sendMessage() {
     if (isGenerating) return;
@@ -716,26 +768,36 @@ function sendMessage() {
     const message = input.value.trim();
     if (!message) return;
 
-    appendMessage('user', message);
+    appendMessage('user', message + (chatAttachmentsMini.length
+        ? ' <i class="bx bx-paperclip" title="' + chatAttachmentsMini.map((a) => a.filename).join(', ') + '"></i>' : ''));
     input.value = '';
     isGenerating = true;
     const typingId = appendTypingIndicator();
 
+    const payload = {
+        message,
+        session_id: chatSessionId,
+        model: document.getElementById('chatModelMini')
+            ? document.getElementById('chatModelMini').value : 'gpt-4o-mini',
+        system_prompt: 'You are a helpful assistant for a note-taking app.',
+        attachments: chatAttachmentsMini,
+    };
+    const effort = document.getElementById('chatEffortMini')
+        ? document.getElementById('chatEffortMini').value : '';
+    if (effort) payload.reasoning_effort = effort;
+
     fetch('/api/chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            message,
-            session_id: chatSessionId,
-            model: 'ollama/llama3.2',
-            system_prompt: 'You are a helpful assistant for a note-taking app.',
-        }),
+        body: JSON.stringify(payload),
     })
         .then((r) => r.json())
         .then((data) => {
             removeTypingIndicator(typingId);
             chatSessionId = data.session_id;
-            appendMessage('assistant', data.reply);
+            appendMessage('assistant', data.reply, true);
+            chatAttachmentsMini = [];
+            renderChatAttChips();
         })
         .catch((err) => {
             removeTypingIndicator(typingId);
@@ -744,14 +806,21 @@ function sendMessage() {
         .finally(() => { isGenerating = false; });
 }
 
-function appendMessage(role, text) {
+function appendMessage(role, text, withCopy) {
     const container = document.getElementById('chat-messages');
     if (!container) return;
     const div = document.createElement('div');
     div.className = 'message ' + role;
     div.innerHTML =
         '<div class="message-avatar">' + (role === 'user' ? '<i class="bx bx-user"></i>' : '<i class="bx bx-bot"></i>') + '</div>' +
-        '<div class="message-content">' + escapeHtml(text) + '</div>';
+        '<div class="message-content">' + escapeHtml(text) +
+        (withCopy ? ' <button class="chat-copy-btn" title="Copy"><i class="bx bx-copy"></i></button>' : '') +
+        '</div>';
+    if (withCopy) {
+        div.querySelector('.chat-copy-btn').onclick = function () {
+            navigator.clipboard.writeText(div.querySelector('.message-content').textContent);
+        };
+    }
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }

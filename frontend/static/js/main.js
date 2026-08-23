@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initBookmarks();
     initTableView();
     initFiles();
+    if (typeof initChatMiniToolbar === 'function') initChatMiniToolbar();
 
     /* Launcher: Calendar opens the month-view panel (events + day notes) */
     const calBtn = document.getElementById('launcherCalendar');

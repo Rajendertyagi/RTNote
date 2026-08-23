@@ -5,6 +5,7 @@ Includes endpoints for sending messages, managing sessions, and listing memories
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from typing import Optional, List
@@ -13,15 +14,24 @@ from app.chat.db import AsyncSessionLocal  # your async session factory
 from app.chat.memory import MemoryManager, ChatSession, Memory
 from pydantic import BaseModel, Field
 
+import json
+
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 # ---------- Pydantic Schemas ----------
+class AttachmentIn(BaseModel):
+    filename: str = "file"
+    content: str = ""
+
+
 class SendMessageRequest(BaseModel):
     message: str = Field(..., min_length=1)
     session_id: Optional[int] = None
     model: str = "gpt-4o-mini"
     system_prompt: Optional[str] = "You are a helpful assistant."
+    reasoning_effort: Optional[str] = None
+    attachments: Optional[List[AttachmentIn]] = None
 
 
 class SendMessageResponse(BaseModel):
@@ -67,6 +77,8 @@ async def send_message(
         session_id=request.session_id,
         system_prompt=request.system_prompt,
         model=request.model,
+        reasoning_effort=request.reasoning_effort,
+        attachments=[a.model_dump() for a in (request.attachments or [])],
     )
     await manager.load_session()
     await manager.add_user_message(request.message)
@@ -79,6 +91,42 @@ async def send_message(
         raise HTTPException(status_code=500, detail="Failed to create or persist chat session")
 
     return SendMessageResponse(session_id=manager.session_id, reply=reply)
+
+
+@router.post("/stream")
+async def stream_message(request: SendMessageRequest, db: AsyncSession = Depends(get_db)):
+    """Stream the assistant reply as Server-Sent Events.
+
+    Events:
+      data: {"type": "meta",  "session_id": N}   — sent first
+      data: {"type": "delta", "text": "..."}     — repeated text chunks
+      data: {"type": "done"}                     — final event
+    """
+    manager = MemoryManager(
+        db=db,
+        session_id=request.session_id,
+        system_prompt=request.system_prompt,
+        model=request.model,
+        reasoning_effort=request.reasoning_effort,
+        attachments=[a.model_dump() for a in (request.attachments or [])],
+    )
+    await manager.load_session()
+    await manager.add_user_message(request.message)
+    session_id = await manager.ensure_session()
+    if not session_id:
+        raise HTTPException(status_code=500, detail="Failed to create or persist chat session")
+
+    async def event_stream():
+        yield f"data: {json.dumps({'type': 'meta', 'session_id': session_id})}\n\n"
+        async for delta in manager.stream_response():
+            yield f"data: {json.dumps({'type': 'delta', 'text': delta})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/sessions", response_model=List[SessionOut])

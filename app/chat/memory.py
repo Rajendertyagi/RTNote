@@ -95,6 +95,8 @@ class MemoryManager:
         memory_limit: int = 5,
         auto_extract: bool = True,
         extraction_timeout: int = 20,
+        reasoning_effort: Optional[str] = None,
+        attachments: Optional[List[dict]] = None,
     ):
         self.db = db
         self.session_id = session_id
@@ -105,6 +107,8 @@ class MemoryManager:
         self.memory_limit = memory_limit
         self.auto_extract = auto_extract
         self.extraction_timeout = extraction_timeout
+        self.reasoning_effort = reasoning_effort
+        self.attachments = attachments or []
         self.messages: List[dict] = []
 
     # ----------------- Session loading / messages -----------------
@@ -126,8 +130,30 @@ class MemoryManager:
         return self
 
     async def add_user_message(self, content: str):
-        """Append a user message to the in-memory conversation buffer."""
+        """Append a user message to the in-memory conversation buffer.
+
+        Text attachments are appended to the message so every provider
+        (vision or not) can use them.
+        """
+        if self.attachments:
+            att_text = "\n\n".join(
+                f"--- Attached file: {a.get('filename', 'file')} ---\n{a.get('content', '')}"
+                for a in self.attachments
+            )
+            content = f"{content}\n\n{att_text}"
         self.messages.append({"role": "user", "content": content})
+
+    def _completion_kwargs(self, **extra) -> dict:
+        """Common kwargs for LLM calls; reasoning_effort only when set."""
+        kwargs = {
+            "model": self.model,
+            "messages": self.messages,
+            "temperature": 0.2,
+        }
+        if self.reasoning_effort:
+            kwargs["reasoning_effort"] = self.reasoning_effort
+        kwargs.update(extra)
+        return kwargs
 
     # ----------------- Main response flow -----------------
     async def get_response(self) -> str:
@@ -166,11 +192,7 @@ class MemoryManager:
         # 2. Call LLM (async, with timeout)
         try:
             response = await asyncio.wait_for(
-                acompletion(
-                    model=self.model,
-                    messages=self.messages,
-                    temperature=0.2,
-                ),
+                acompletion(**self._completion_kwargs()),
                 timeout=60,
             )
             assistant_reply = response.choices[0].message.content
@@ -192,6 +214,83 @@ class MemoryManager:
             asyncio.create_task(self._extract_memories_background(recent))
 
         return assistant_reply
+
+    # ----------------- Streaming response flow -----------------
+    async def _augment_with_memories(self):
+        """Prepend relevant memories to the system prompt (shared by both flows)."""
+        if not self.messages:
+            return
+        last_user = None
+        for m in reversed(self.messages):
+            if m.get("role") == "user":
+                last_user = m.get("content")
+                break
+        if not last_user:
+            return
+        try:
+            memories = await self._search_memories(last_user)
+        except Exception:
+            logger.exception("Memory search failed")
+            memories = []
+        if not memories:
+            return
+        memory_context = "\n".join(f"- {m}" for m in memories)
+        if self.messages and self.messages[0].get("role") == "system":
+            self.messages[0]["content"] = (
+                self.system_prompt + "\n\nRelevant past facts:\n" + memory_context
+            )
+        else:
+            self.messages.insert(
+                0,
+                {
+                    "role": "system",
+                    "content": self.system_prompt + "\n\nRelevant past facts:\n" + memory_context,
+                },
+            )
+
+    async def ensure_session(self) -> int:
+        """Persist the current messages so a session_id exists before streaming."""
+        await self._save()
+        return self.session_id
+
+    async def stream_response(self):
+        """Async generator yielding text deltas; persists the session at the end.
+
+        The caller must have called ensure_session() first so the client can
+        track the session id while deltas are still streaming.
+        """
+        try:
+            await self._augment_with_memories()
+            response = await asyncio.wait_for(
+                acompletion(**self._completion_kwargs(stream=True)),
+                timeout=120,
+            )
+            parts: List[str] = []
+            async for chunk in response:
+                delta = ""
+                try:
+                    delta = chunk.choices[0].delta.content or ""
+                except (AttributeError, IndexError):
+                    delta = ""
+                if delta:
+                    parts.append(delta)
+                    yield delta
+            reply = "".join(parts) or "(empty response)"
+        except asyncio.TimeoutError:
+            logger.exception("LLM stream timed out")
+            reply = "Sorry, I couldn't generate a response right now due to a timeout."
+            yield reply
+        except Exception:
+            logger.exception("LLM stream failed")
+            reply = "Sorry, I had trouble generating a response right now."
+            yield reply
+
+        self.messages.append({"role": "assistant", "content": reply})
+        await self._save()
+
+        if self.auto_extract:
+            recent = self.messages[-8:]
+            asyncio.create_task(self._extract_memories_background(recent))
 
     # ----------------- Background extraction -----------------
     async def _extract_memories_background(self, recent_messages: List[dict]):

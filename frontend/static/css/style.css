@@ -743,3 +743,37 @@
     border-radius: 8px;
     background: #ffffff; /* pages default to a white canvas; they can paint their own bg */
 }
+
+/* ── Mini chat toolbar (sidebar chat) ── */
+.chat-mini-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border, #333);
+}
+.chat-mini-toolbar select {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-secondary, transparent);
+    color: inherit;
+    border: 1px solid var(--border, #444);
+    border-radius: 5px;
+    padding: 3px 4px;
+    font-size: 11px;
+}
+.chat-att-chips {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    padding: 6px 8px 0;
+}
+.chat-copy-btn {
+    border: none;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    opacity: .5;
+    padding: 0 2px;
+}
+.chat-copy-btn:hover { opacity: 1; }

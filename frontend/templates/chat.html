@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat — RTW</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/chat.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css">
+</head>
+<body>
+    <div class="chat-app">
+        <!-- Sessions sidebar -->
+        <aside class="chat-sessions">
+            <div class="chat-sessions__header">
+                <span>Sessions</span>
+                <button class="btn-sm" id="newChatBtn" title="New chat"><i class='bx bx-plus'></i> New</button>
+            </div>
+            <div class="chat-sessions__list" id="sessionList"></div>
+            <div class="chat-sessions__footer">
+                <a href="/" class="btn-sm"><i class='bx bx-left-arrow-alt'></i> Back to notes</a>
+            </div>
+        </aside>
+
+        <!-- Main chat -->
+        <main class="chat-main">
+            <header class="chat-toolbar">
+                <div class="chat-toolbar__group">
+                    <label for="modelSelect">Model</label>
+                    <select id="modelSelect"></select>
+                    <input type="text" id="customModel" placeholder="or custom: ollama/llama3"
+                           class="chat-custom-model" spellcheck="false">
+                </div>
+                <div class="chat-toolbar__group" id="effortGroup" hidden>
+                    <label>Thinking</label>
+                    <div class="effort-segments" id="effortSegments"></div>
+                </div>
+                <button class="btn-sm" id="sysPromptToggle" title="System prompt">
+                    <i class='bx bx-slider'></i> System
+                </button>
+            </header>
+
+            <div class="sys-prompt-editor hidden" id="sysPromptEditor">
+                <textarea id="systemPrompt" rows="3"
+                          placeholder="You are a helpful assistant."></textarea>
+                <p class="hint">Saved automatically per browser.</p>
+            </div>
+
+            <div class="chat-stream" id="chatStream"></div>
+
+            <div class="attachments-bar hidden" id="attachmentsBar"></div>
+
+            <footer class="composer">
+                <div class="composer__actions">
+                    <button class="btn-icon" id="attachFileBtn" title="Attach text files"><i class='bx bx-paperclip'></i></button>
+                    <input type="file" id="chatFileInput" multiple hidden
+                           accept=".txt,.md,.markdown,.csv,.json,.py,.js,.ts,.html,.css,.xml,.yml,.yaml,.log,.sql,.sh,.toml,.ini">
+                    <button class="btn-icon" id="attachNoteBtn" title="Attach from note attachments"><i class='bx bx-file'></i></button>
+                    <button class="btn-icon" id="stopBtn" title="Stop generating" hidden><i class='bx bx-stop-circle'></i></button>
+                </div>
+                <textarea id="chatComposer" rows="1"
+                          placeholder="Message the assistant…  (Enter to send, Shift+Enter for newline)"></textarea>
+                <button class="btn-icon send" id="sendBtn" title="Send"><i class='bx bxs-send'></i></button>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Attach-from-note modal -->
+    <div class="modal-overlay hidden" id="noteAttachModal">
+        <div class="modal">
+            <h3>Attach from note</h3>
+            <label>Note</label>
+            <select id="noteSelect"></select>
+            <label>Attachment (text files only)</label>
+            <select id="noteAttSelect"></select>
+            <div class="modal__actions">
+                <button class="btn-sm" id="noteAttCancel">Cancel</button>
+                <button class="btn-sm primary" id="noteAttAdd">Attach</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/chat.js?v=1"></script>
+</body>
+</html>
