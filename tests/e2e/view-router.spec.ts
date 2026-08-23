@@ -8,7 +8,7 @@ test.describe("View router exclusivity", () => {
     await request.post("/api/notes", { data: { title: "Router B" } });
 
     await page.goto("/");
-    await page.waitForFunction(() => (window as any).App?.bootDone === true, undefined, {
+    await page.waitForFunction(() => typeof App !== "undefined" && App.bootDone === true, undefined, {
       timeout: 30000,
     });
     await page.locator("#searchInput").fill("Router A");

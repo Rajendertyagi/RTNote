@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 /* Wait until the app finished booting (incl. tab restore). Prevents racing
    the async boot chain on slow/CDN-latency runners. */
 async function waitForAppBoot(page: import("@playwright/test").Page) {
-  await page.waitForFunction(() => (window as any).App?.bootDone === true, undefined, {
+  await page.waitForFunction(() => typeof App !== "undefined" && App.bootDone === true, undefined, {
     timeout: 30000,
   });
 }
