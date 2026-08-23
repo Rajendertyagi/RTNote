@@ -67,7 +67,13 @@ function isDescendantOf(descId, ancestorId) {
 
 /* Single flow for every tree mutation: API → refresh choke point → reveal.
    Returns true on success; failures surface as a toast (never silent). */
+/* Single flow for every tree mutation: API → refresh choke point → reveal.
+   Returns true on success; failures surface as a toast (never silent).
+   Reentrancy lock: multiple keydown bindings must not double-fire a move. */
+let _moveInFlight = false;
 async function moveNoteFlow(noteId, parentId, position) {
+    if (_moveInFlight) return true;
+    _moveInFlight = true;
     try {
         await apiMoveNote(noteId, parentId, position);
         await refreshTree();
@@ -81,6 +87,8 @@ async function moveNoteFlow(noteId, parentId, position) {
     } catch (err) {
         showToast(err.message || 'Move failed', 'error');
         return false;
+    } finally {
+        _moveInFlight = false;
     }
 }
 
@@ -233,26 +241,32 @@ async function initTree() {
         openNoteInTab(meta.parent_id);
     });
 
-    /* GUI-4 keyboard tree movement. Bound at DOCUMENT capture phase:
-       Wunderbaum handles/swallows arrow keys at the container level, so a
-       bubble-phase listener never sees them. Guarded by focus inside the
-       tree, so typing in the editor can never mutate hierarchy. */
-    document.addEventListener('keydown', (e) => {
+    /* GUI-4 keyboard tree movement. Primary binding: document capture phase
+       (runs before Wunderbaum's own arrow-key handling). Backup: container
+       bubble phase. moveNoteFlow's reentrancy lock dedupes double-fires.
+       Focus-guarded so typing in the editor can never mutate hierarchy. */
+    const handleTreeMoveKeydown = (e) => {
         if (!(e.ctrlKey && !e.shiftKey && !e.altKey)) return;
         if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+        const ae = document.activeElement;
+        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
         const treeEl = document.getElementById('note-tree');
-        if (!treeEl || !treeEl.contains(document.activeElement)) return;
+        const inTree = treeEl && (treeEl.contains(ae) || ae === treeEl);
         const t = mar10.Wunderbaum.getTree('note-tree');
         const node = t && typeof t.getActiveNode === 'function' ? t.getActiveNode() : null;
-        if (!node) return;
+        if (!inTree && !node) return; // neither focus nor a working selection
         e.preventDefault();
         e.stopImmediatePropagation();
+        if (!node) return;
         const id = Number(node.key);
+        window.__treeMoveLast = { id, key: e.key, at: Date.now() };
         if (e.key === 'ArrowUp') treeMoveRelative(id, -1);
         else if (e.key === 'ArrowDown') treeMoveRelative(id, 1);
         else if (e.key === 'ArrowLeft') treePromote(id);
         else if (e.key === 'ArrowRight') treeNestIntoPrevSibling(id);
-    }, true);
+    };
+    document.addEventListener('keydown', handleTreeMoveKeydown, true);
+    el.addEventListener('keydown', handleTreeMoveKeydown);
 
     new mar10.Wunderbaum({
         id: 'note-tree',

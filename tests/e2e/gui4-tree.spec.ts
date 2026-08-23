@@ -74,6 +74,8 @@ test.describe("Tree keyboard movement", () => {
       hist: NavHistory.debug(),
       active: document.activeElement?.tagName,
       inTree: document.getElementById("note-tree").contains(document.activeElement),
+      kbdFired: (window as unknown as { __treeMoveLast?: unknown }).__treeMoveLast ?? "never",
+      moveErrs: (page as unknown as { _gui4Errors?: string[] })._gui4Errors ?? [],
       rows: Array.from(document.querySelectorAll("#note-tree .wb-row")).map((r) => r.textContent?.trim()),
       cache: (typeof _notesCache !== "undefined" ? _notesCache : []).map((n: { title: string; parent_id: number | null; position: number | null }) => `${n.title}:p${n.parent_id},pos${n.position}`),
     }));
