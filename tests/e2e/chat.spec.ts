@@ -134,12 +134,17 @@ test.describe("CDN failure fallback", () => {
     await expect(page.getByTestId("stop-btn")).toBeHidden();
     await expect(page.getByTestId("send-btn")).toBeEnabled();
 
-    const bubble = page.getByTestId("chat-stream").locator(".msg.assistant .bubble").last();
+    // Pin the exact last message (not a descendant-dependent .last() chain)
+    const lastMsg = page.getByTestId("chat-stream").locator(".msg").last();
+    await expect(lastMsg).toHaveAttribute("data-testid", "msg-assistant");
+    const bubble = lastMsg.locator(".bubble");
     await expect(bubble).toContainText("Hello from the");
     // no markdown rendering happened — raw asterisks visible as plain text
     await expect(bubble.locator("strong")).toHaveCount(0);
-    // copy still wired and uses the raw source
-    await expect(bubble.locator(".copy-btn")).toHaveCount(1);
+    // copy still wired and uses the raw source; if this ever fails again the
+    // assertion message carries the bubble's full HTML for diagnosis
+    const bubbleHtml = await bubble.evaluate((el) => el.innerHTML);
+    await expect(bubble.locator(".copy-btn"), `bubble html: ${bubbleHtml}`).toHaveCount(1);
   });
 });
 

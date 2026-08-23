@@ -271,7 +271,9 @@ const ChatCore = (() => {
     function flush() {
       scheduled = false;
       bubble.classList.remove("typing");
-      setBubbleContent(bubble, full, "assistant");
+      // Re-render only on real changes — a redundant innerHTML write here
+      // would wipe the copy button appended after stream completion.
+      if (bubble.dataset.raw !== full) setBubbleContent(bubble, full, "assistant");
       scrollToBottom(container);
     }
     return {
