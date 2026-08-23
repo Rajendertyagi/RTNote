@@ -72,6 +72,11 @@ async function moveNoteFlow(noteId, parentId, position) {
         await apiMoveNote(noteId, parentId, position);
         await refreshTree();
         revealNoteInTree(noteId);
+        // The open note's breadcrumb reflects hierarchy — refresh it after
+        // moving the currently open note.
+        if (App.currentNoteId === Number(noteId) && typeof renderBreadcrumb === 'function') {
+            renderBreadcrumb(noteId);
+        }
         return true;
     } catch (err) {
         showToast(err.message || 'Move failed', 'error');
@@ -217,40 +222,37 @@ async function initTree() {
     // Root-level notes are a no-op; never fires while typing elsewhere
     // because the listener is scoped to the tree container.
     el.addEventListener('keydown', (e) => {
+        if (e.key !== 'Backspace') return;
         const t = mar10.Wunderbaum.getTree('note-tree');
         const node = t && typeof t.getActiveNode === 'function' ? t.getActiveNode() : null;
-
-        if (e.key === 'Backspace') {
-            if (!node) return;
-            const id = Number(node.key);
-            const meta = _notesCache.find((n) => n.id === id);
-            if (!meta || meta.parent_id == null) return; // root-level: no-op
-            e.preventDefault();
-            openNoteInTab(meta.parent_id);
-            return;
-        }
-
-        /* GUI-4 keyboard tree movement — only with tree focus, so typing in
-           the editor/inputs can never trigger a hierarchy mutation. */
-        if (e.ctrlKey && !e.shiftKey && !e.altKey) {
-            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                if (!node) return;
-                e.preventDefault();
-                e.stopPropagation();
-                treeMoveRelative(Number(node.key), e.key === 'ArrowUp' ? -1 : 1);
-            } else if (e.key === 'ArrowLeft') {
-                if (!node) return;
-                e.preventDefault();
-                e.stopPropagation();
-                treePromote(Number(node.key));
-            } else if (e.key === 'ArrowRight') {
-                if (!node) return;
-                e.preventDefault();
-                e.stopPropagation();
-                treeNestIntoPrevSibling(Number(node.key));
-            }
-        }
+        if (!node) return;
+        const id = Number(node.key);
+        const meta = _notesCache.find((n) => n.id === id);
+        if (!meta || meta.parent_id == null) return; // root-level: no-op
+        e.preventDefault();
+        openNoteInTab(meta.parent_id);
     });
+
+    /* GUI-4 keyboard tree movement. Bound at DOCUMENT capture phase:
+       Wunderbaum handles/swallows arrow keys at the container level, so a
+       bubble-phase listener never sees them. Guarded by focus inside the
+       tree, so typing in the editor can never mutate hierarchy. */
+    document.addEventListener('keydown', (e) => {
+        if (!(e.ctrlKey && !e.shiftKey && !e.altKey)) return;
+        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+        const treeEl = document.getElementById('note-tree');
+        if (!treeEl || !treeEl.contains(document.activeElement)) return;
+        const t = mar10.Wunderbaum.getTree('note-tree');
+        const node = t && typeof t.getActiveNode === 'function' ? t.getActiveNode() : null;
+        if (!node) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const id = Number(node.key);
+        if (e.key === 'ArrowUp') treeMoveRelative(id, -1);
+        else if (e.key === 'ArrowDown') treeMoveRelative(id, 1);
+        else if (e.key === 'ArrowLeft') treePromote(id);
+        else if (e.key === 'ArrowRight') treeNestIntoPrevSibling(id);
+    }, true);
 
     new mar10.Wunderbaum({
         id: 'note-tree',

@@ -12,13 +12,27 @@ async function waitForAppBoot(page: import("@playwright/test").Page) {
 
 const uniq = () => Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
 
-test.beforeEach(async ({ request }) => {
+test.beforeEach(async ({ page, request }) => {
+  // Surface silent failures: uncaught page errors and failed /move calls
+  // are attached to every assertion message via this shared state.
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
+  page.on("response", (r) => {
+    if (r.url().includes("/move") && !r.ok()) errors.push(`move ${r.status()}`);
+  });
+  (page as unknown as { _gui4Errors: string[] })._gui4Errors = errors;
+
   const notes = await (await request.get("/api/notes")).json();
   for (const n of notes as Array<{ id: number }>) {
     await request.delete(`/api/notes/${n.id}`).catch(() => {});
   }
   await request.post("/api/trash/empty");
 });
+
+function diag(page: import("@playwright/test").Page) {
+  const errs = (page as unknown as { _gui4Errors?: string[] })._gui4Errors ?? [];
+  return errs.length ? ` [errors: ${errs.join(" | ")}]` : "";
+}
 
 function treeOrder(page: import("@playwright/test").Page) {
   return page.evaluate(() =>
@@ -30,7 +44,7 @@ function treeOrder(page: import("@playwright/test").Page) {
 
 async function openInTree(page: import("@playwright/test").Page, title: string) {
   await page.locator("#note-tree .wb-row", { hasText: title }).first().click();
-  await expect(page.locator("#topbar-title")).toContainText(title, { timeout: 10000 });
+  await expect(page.locator("#topbar-title"), title + diag(page)).toContainText(title, { timeout: 10000 });
 }
 
 test.describe("Tree keyboard movement", () => {
@@ -101,7 +115,7 @@ test.describe("Tree keyboard movement", () => {
     await page.locator("#quickSearchInput").fill(title);
     await resp;
     await page.keyboard.press("Enter");
-    await expect(page.locator("#topbar-title")).toContainText(title, { timeout: 10000 });
+    await expect(page.locator("#topbar-title"), title + diag(page)).toContainText(title, { timeout: 10000 });
   }
 });
 
