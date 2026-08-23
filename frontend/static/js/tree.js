@@ -111,6 +111,18 @@ async function initTree() {
         console.error('Failed to load notes for tree:', err);
     }
 
+    // Middle-click on a row: open in a background tab (no autoscroll)
+    el.addEventListener('mousedown', (e) => {
+        if (e.button !== 1) return;
+        const row = e.target.closest('.wb-row');
+        if (!row) return;
+        e.preventDefault();
+        let node = null;
+        try { node = mar10.Wunderbaum.getNode(row); } catch (err) { /* ignore */ }
+        const id = node ? parseInt(node.key, 10) : NaN;
+        if (!isNaN(id) && typeof openNoteInBackground === 'function') openNoteInBackground(id);
+    });
+
     // Backspace with tree focus → jump to the parent note (Trilium pattern).
     // Root-level notes are a no-op; never fires while typing elsewhere
     // because the listener is scoped to the tree container.
@@ -157,7 +169,16 @@ async function initTree() {
             if (!ev) return;
             const id = parseInt(e.node.key, 10);
             if (_treeReloadGuard && id === Number(App.currentNoteId)) return;
-            if (!isNaN(id)) openNoteInTab(id);
+            if (isNaN(id)) return;
+            // Ctrl/Cmd+click and middle-click: open in a background tab
+            // without leaving the current note (Trilium's new-tab pattern;
+            // deviation: RTNote gives every note its own tab on plain click,
+            // so the modifier variants add the *background* behavior).
+            if (ev.ctrlKey || ev.metaKey || ev.button === 1) {
+                if (typeof openNoteInBackground === 'function') openNoteInBackground(id);
+                return;
+            }
+            openNoteInTab(id);
         },
     });
 }

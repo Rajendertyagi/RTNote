@@ -352,6 +352,13 @@
   .tabs { display: flex; gap: 2px; padding: 6px 10px; border-bottom: 1px solid var(--border-light); overflow-x: auto; background: var(--bg-main); }
   .tab { padding: 5px 12px; border-radius: var(--radius-md); font-size: 12px; color: var(--text-2); cursor: pointer; border: 1px solid transparent; display: flex; align-items: center; gap: 6px; white-space: nowrap; transition: all 0.12s; }
   .tab:hover { background: var(--bg-hover); color: var(--text-1); } .tab.active { background: var(--bg-active); color: var(--text-1); border-color: var(--border); font-weight: 500; }
+  /* GUI-3 desktop-tab treatment */
+  .tab:focus-visible { outline: 2px solid var(--accent, #89b4fa); outline-offset: -1px; }
+  .tab.modified > span:first-child::after {
+    content: "•"; margin-left: 5px; color: var(--yellow, #f9e2af); font-weight: 700;
+  }
+  .tabs::-webkit-scrollbar { height: 6px; }
+  .tabs::-webkit-scrollbar-thumb { background: var(--border, #444); border-radius: 3px; }
   .switch { display: inline-flex; background: var(--bg-hover); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: 2px; gap: 2px; }
   .switch button { padding: 4px 10px; border-radius: var(--radius-md); font-size: 11px; color: var(--text-2); background: transparent; border: none; cursor: pointer; transition: all 0.12s; }
   .switch button.active { background: var(--bg-main); color: var(--text-1); box-shadow: var(--shadow-xs); border: 1px solid var(--border-light); }
@@ -468,8 +475,9 @@
 /* Tab add button + close */
 .add-tab { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 6px; cursor: pointer; color: var(--text-3); }
 .add-tab:hover { background: var(--bg-hover); }
-.tab .close { margin-left: 6px; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 4px; opacity: .6; }
-.tab .close:hover { background: var(--border); opacity: 1; }
+  .tab .close { margin-left: 6px; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 4px; opacity: 0; transition: opacity 0.12s; }
+  .tab:hover .close, .tab.active .close { opacity: 0.6; }
+  .tab .close:hover { background: var(--border); opacity: 1; }
 
 /* Misc utilities used by markup */
 .spacer { flex: 1; }

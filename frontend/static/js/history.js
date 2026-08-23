@@ -66,6 +66,10 @@ const NavHistory = (() => {
 
   function endNavigate() { suppress = false; }
 
+  /* Explicit suppression for workspace operations (tab switching/closing)
+     that change the active note without being note navigation. */
+  function beginSuppress() { suppress = true; }
+
   /* Recent notes, most recent first, excluding the current one —
      powers the empty-state of the jump/search overlay. */
   function recent(count = 8) {
@@ -78,7 +82,7 @@ const NavHistory = (() => {
   }
 
   return {
-    push, peek, step, skip, endNavigate,
+    push, peek, step, skip, endNavigate, beginSuppress,
     canBack, canForward, recent,
     set onChange(fn) { onChange = fn; },
     /* Debug/introspection for E2E diagnostics */

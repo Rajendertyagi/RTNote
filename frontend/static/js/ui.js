@@ -43,7 +43,7 @@ function renderTabs() {
     const addBtn = tabsEl.querySelector('.add-tab');
     TabState.open.forEach((t) => {
         const div = document.createElement('div');
-        div.className = 'tab' + (t.id === TabState.activeId ? ' active' : '');
+        div.className = 'tab' + (t.id === TabState.activeId ? ' active' : '') + (t._dirty ? ' modified' : '');
         div.dataset.noteId = t.id;
         div.title = t.title;
         div.innerHTML =
@@ -51,13 +51,41 @@ function renderTabs() {
             '<span class="close"><i class="bx bx-x"></i></span>';
         tabsEl.insertBefore(div, addBtn);
     });
+    // Keep the active tab reachable when many tabs overflow the row
+    const activeEl = tabsEl.querySelector('.tab.active');
+    if (activeEl && activeEl.scrollIntoView) {
+        activeEl.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    }
 }
 
-async function activateTab(noteId) {
+/* Dirty indicator (GUI-3): derived from the editor save lifecycle —
+   set on first unsaved keystroke, cleared only by a successful save
+   (or note switch to a clean note). Never persisted. */
+function markTabDirty(noteId, dirty) {
+    const t = TabState.open.find((x) => x.id === Number(noteId));
+    if (!t || !!t._dirty === !!dirty) return;
+    t._dirty = !!dirty;
+    const el = document.querySelector('#tabs .tab[data-note-id="' + noteId + '"]');
+    if (el) el.classList.toggle('modified', t._dirty);
+}
+
+async function activateTab(noteId, opts = {}) {
     TabState.activeId = noteId;
     renderTabs();
     persistTabs();
-    await openNoteInEditor(noteId);
+    /* Tab mechanics (clicking a tab, Ctrl+Tab cycling, close-neighbor
+       activation) are workspace operations, not note navigation — they must
+       not pollute GUI-2 history. opts.fromTabs suppresses recording. */
+    if (opts.fromTabs && typeof NavHistory !== 'undefined' && NavHistory.beginSuppress) {
+        NavHistory.beginSuppress();
+    }
+    try {
+        await openNoteInEditor(noteId);
+    } finally {
+        if (opts.fromTabs && typeof NavHistory !== 'undefined' && NavHistory.endNavigate) {
+            NavHistory.endNavigate();
+        }
+    }
 }
 
 async function openNoteInTab(noteId) {
@@ -86,7 +114,7 @@ function closeTabByNoteId(noteId) {
     if (wasActive) {
         const next = TabState.open[Math.min(idx, TabState.open.length - 1)];
         if (next) {
-            activateTab(next.id);
+            activateTab(next.id, { fromTabs: true });
         } else {
             TabState.activeId = null;
             App.currentNoteId = null;
@@ -139,8 +167,68 @@ function initTabs() {
         const tab = e.target.closest('.tab');
         if (!tab || !tab.dataset.noteId) return;
         if (e.target.closest('.close')) { closeTabByNoteId(tab.dataset.noteId); return; }
-        activateTab(Number(tab.dataset.noteId));
+        activateTab(Number(tab.dataset.noteId), { fromTabs: true });
     });
+    /* Middle-click closes a tab without touching the active note */
+    tabsEl.addEventListener('mousedown', (e) => {
+        if (e.button !== 1) return;
+        const tab = e.target.closest('.tab');
+        if (!tab || !tab.dataset.noteId) return;
+        e.preventDefault(); // stop middle-click autoscroll
+        closeTabByNoteId(tab.dataset.noteId);
+    });
+
+    /* Desktop tab keyboard model.
+       Ctrl+W / Ctrl+Tab are browser-reserved in some environments; Alt+W and
+       Ctrl+PageUp/PageDown are wired as always-available equivalents. */
+    document.addEventListener('keydown', (e) => {
+        const closeActive = () => {
+            if (TabState.activeId != null) closeTabByNoteId(TabState.activeId);
+        };
+        if (e.ctrlKey && !e.shiftKey && (e.key === 'w' || e.key === 'W')) {
+            e.preventDefault();
+            closeActive();
+        } else if (e.altKey && (e.key === 'w' || e.key === 'W')) {
+            e.preventDefault();
+            closeActive();
+        } else if (e.ctrlKey && e.key === 'Tab') {
+            e.preventDefault();
+            cycleTab(e.shiftKey ? -1 : 1);
+        } else if (e.ctrlKey && e.key === 'PageDown') {
+            e.preventDefault();
+            cycleTab(1);
+        } else if (e.ctrlKey && e.key === 'PageUp') {
+            e.preventDefault();
+            cycleTab(-1);
+        }
+    });
+}
+
+/* Ctrl+Tab / Ctrl+Shift+Tab / Ctrl+PageUp/Down: cycle through open tabs.
+   Wraps at both ends; no-op with fewer than two tabs. Tab cycling is a
+   workspace operation — history stays untouched. */
+function cycleTab(dir) {
+    const n = TabState.open.length;
+    if (n < 2) return;
+    const idx = TabState.open.findIndex((t) => t.id === TabState.activeId);
+    const next = TabState.open[(idx + dir + n) % n];
+    activateTab(next.id, { fromTabs: true });
+}
+
+/* Open a note in its own tab WITHOUT switching to it (Ctrl+click /
+   middle-click on tree rows). No-op when it already has a tab. */
+async function openNoteInBackground(noteId) {
+    await App.bootReady;
+    noteId = Number(noteId);
+    if (isNaN(noteId)) return;
+    if (TabState.open.some((t) => t.id === noteId)) return;
+    try {
+        const n = await apiGetNote(noteId);
+        if (n.deleted_at) return;
+        TabState.open.push({ id: n.id, title: n.title });
+        renderTabs();
+        persistTabs();
+    } catch (err) { /* missing note → ignore */ }
 }
 
 /* ── Navigation (GUI-2): history stepping + clickable breadcrumbs ── */

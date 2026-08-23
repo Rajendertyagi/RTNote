@@ -204,6 +204,10 @@ function setSaveState(state) {
     const el = document.getElementById('status-left');
     if (!el) return;
     el.classList.remove('st-dirty', 'st-saving', 'st-saved', 'st-error');
+    /* Tab modified indicator shares the same lifecycle (GUI-3) */
+    if (typeof markTabDirty === 'function') {
+        markTabDirty(App.currentNoteId, state === 'dirty' || state === 'error' || state === 'saving');
+    }
     switch (state) {
         case 'dirty':  el.textContent = 'Unsaved changes'; el.classList.add('st-dirty'); break;
         case 'saving': el.textContent = 'Saving…'; el.classList.add('st-saving'); break;
