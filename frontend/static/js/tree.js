@@ -103,6 +103,21 @@ async function initTree() {
         return;
     }
 
+    // Ctrl/Cmd+click on a row → open in a background tab. Capture phase,
+    // registered before the tree: Wunderbaum's select-mode would otherwise
+    // swallow modifier-clicks without ever emitting `activate`.
+    el.addEventListener('click', (e) => {
+        if (!(e.ctrlKey || e.metaKey)) return;
+        const row = e.target.closest('.wb-row');
+        if (!row) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        let node = null;
+        try { node = mar10.Wunderbaum.getNode(row); } catch (err) { /* ignore */ }
+        const id = node ? parseInt(node.key, 10) : NaN;
+        if (!isNaN(id) && typeof openNoteInBackground === 'function') openNoteInBackground(id);
+    }, true);
+
     let source = [];
     try {
         _notesCache = await apiListNotes();
