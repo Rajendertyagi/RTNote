@@ -1,4 +1,4 @@
-﻿/* connections.js â€” provider key/base-URL management page. */
+/* connections.js — provider key/base-URL management page. */
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,11 +20,11 @@ function render(providers) {
     card.querySelector(".conn-card__name").textContent = p.label;
 
     const status = card.querySelector(".conn-status");
-    status.textContent = p.configured ? "â— connected" : "â—‹ not connected";
+    status.textContent = p.configured ? "● connected" : "○ not connected";
     status.classList.add(p.configured ? "ok" : "off");
 
     const keyInput = card.querySelector(".conn-key");
-    keyInput.placeholder = p.api_key_masked || "sk-â€¦";
+    keyInput.placeholder = p.api_key_masked || "sk-…";
     if (!p.needs_key) keyInput.closest("label").style.display = "none";
 
     const urlInput = card.querySelector(".conn-url");
@@ -57,7 +57,7 @@ async function save(card, pid, result) {
   const url = card.querySelector(".conn-url").value.trim();
   if (key) body.api_key = key;
   if (url) body.base_url = url;
-  result.textContent = "Savingâ€¦";
+  result.textContent = "Saving…";
   try {
     const r = await fetch(`/api/connections/${pid}`, {
       method: "PUT",
@@ -66,23 +66,23 @@ async function save(card, pid, result) {
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || r.status);
-    result.textContent = "âœ” Saved";
+    result.textContent = "✔ Saved";
     refreshSoon();
   } catch (e) {
-    result.textContent = `âœ– ${e.message}`;
+    result.textContent = `✖ ${e.message}`;
   }
 }
 
 async function test(card, pid, result) {
-  result.textContent = "Testingâ€¦";
+  result.textContent = "Testing…";
   try {
     const r = await fetch(`/api/connections/${pid}/test`, { method: "POST", cache: "no-store" });
     const data = await r.json();
     result.textContent = data.ok
-      ? `âœ” OK (${data.latency_ms} ms)`
-      : `âœ– ${data.error || "failed"}`;
+      ? `✔ OK (${data.latency_ms} ms)`
+      : `✖ ${data.error || "failed"}`;
   } catch (e) {
-    result.textContent = `âœ– ${e.message}`;
+    result.textContent = `✖ ${e.message}`;
   }
 }
 
@@ -93,7 +93,7 @@ async function removeConn(card, pid, result) {
     result.textContent = "Deleted";
     refreshSoon();
   } catch (e) {
-    result.textContent = `âœ– ${e.message}`;
+    result.textContent = `✖ ${e.message}`;
   }
 }
 

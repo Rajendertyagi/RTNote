@@ -777,3 +777,50 @@
     padding: 0 2px;
 }
 .chat-copy-btn:hover { opacity: 1; }
+
+/* ═══ F4/F2 — Code note view (CodeMirror 6) ═══ */
+.code-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border, #333);
+}
+.code-mime-select {
+    background: var(--bg-input, #1e1e2e);
+    color: var(--text, #cdd6f4);
+    border: 1px solid var(--border, #444);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 12px;
+}
+.code-wrap-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    opacity: .75;
+    cursor: pointer;
+}
+.code-body {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+}
+.code-editor-host {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+}
+.code-editor-host.split { flex: .6; }
+.code-editor-host .cm-editor { height: 100%; }
+.code-editor-host .cm-scroller { overflow: auto; }
+.code-preview {
+    flex: .4;
+    border: none;
+    border-left: 1px solid var(--border, #333);
+    background: #fff;
+}
+#view-code { flex-direction: column; gap: 0; }

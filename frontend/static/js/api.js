@@ -1,6 +1,16 @@
-/* api.js — all backend communication + shared app state */
+/* api.js — all backend communication + shared app state.
+
+   The `App` object is the ONLY sanctioned cross-file mutable state.
+   Keep every property declared here — no dynamic additions. What belongs:
+   - currentNoteId / currentNoteType : the note open in the main pane
+     (currentNoteType is derived from the API's `type` field on every open)
+   - editor                          : the SunEditor instance
+   - bookmarks / bookmarkList        : bookmark state for strip + star toggle
+   Anything feature-local (tab list, timers, editor internals) stays in its
+   own file as a module-level let — do NOT move it here. */
 const App = {
     currentNoteId: null,
+    currentNoteType: null, // 'text' | 'html' | 'page' | 'webview' | 'mermaid' | 'mindMap' | 'code'
     editor: null,
     bookmarks: new Set(),   // note ids currently bookmarked
     bookmarkList: [],       // ordered bookmark rows for the strip

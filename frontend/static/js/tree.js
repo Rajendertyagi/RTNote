@@ -9,6 +9,7 @@ const NOTE_TYPE_ICONS = {
     webview: 'bx bx-link-external',
     mermaid: 'bx bx-git-branch',
     mindMap: 'bx bx-network-chart',
+    code: 'bx bx-code',
 };
 
 function buildTreeSource(notes) {

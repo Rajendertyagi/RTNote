@@ -58,7 +58,6 @@ async function activateTab(noteId) {
     renderTabs();
     persistTabs();
     await openNoteInEditor(noteId);
-    if (typeof tableViewOn !== 'undefined' && tableViewOn) renderTableView();
 }
 
 async function openNoteInTab(noteId) {
@@ -598,8 +597,8 @@ function initTableView() {
     if (btn) {
         btn.addEventListener('click', () => {
             tableViewOn = !tableViewOn;
-            document.getElementById('table-view').classList.toggle('hidden', !tableViewOn);
-            document.getElementById('editor-wrap').classList.toggle('hidden', tableViewOn);
+            // Route through the view router so views stay mutually exclusive
+            showTypeView(tableViewOn ? 'table-view' : viewIdForType(App.currentNoteType));
             if (tableViewOn) renderTableView();
         });
     }

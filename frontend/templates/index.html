@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" data-theme="catppuccin-mocha">
 <head>
     <meta charset="UTF-8">
@@ -26,11 +26,63 @@
     <script type="module">
         import MindElixir from 'https://cdn.jsdelivr.net/npm/mind-elixir@4/dist/MindElixir.min.js';
         window.MindElixir = MindElixir;
+        window.dispatchEvent(new Event('mindelixir-ready'));
+    </script>
+    <!-- CodeMirror 6 (F4 code notes) — ESM-only like MindElixir; core up front,
+         language modes imported lazily per mime by editor.js. The `codemirror`
+         meta-package resolves to a UMD build on esm.sh, so basicSetup is
+         composed here from the scoped packages instead. -->
+    <script type="module">
+        import { EditorView, keymap, highlightSpecialChars, drawSelection, dropCursor,
+                 rectangularSelection, crosshairCursor, lineNumbers } from 'https://esm.sh/@codemirror/view@6';
+        import { EditorState, Compartment } from 'https://esm.sh/@codemirror/state@6';
+        import { defaultKeymap, history, historyKeymap } from 'https://esm.sh/@codemirror/commands@6';
+        import { foldGutter, indentOnInput, syntaxHighlighting, defaultHighlightStyle,
+                 bracketMatching, StreamLanguage } from 'https://esm.sh/@codemirror/language@6';
+        import { closeBrackets } from 'https://esm.sh/@codemirror/autocomplete@6';
+        import { searchKeymap, highlightSelectionMatches } from 'https://esm.sh/@codemirror/search@6';
+        import { oneDark } from 'https://esm.sh/@codemirror/theme-one-dark@6';
+
+        const basicSetup = [
+            lineNumbers(), highlightSpecialChars(), history(), drawSelection(), dropCursor(),
+            EditorState.allowMultipleSelections.of(true),
+            indentOnInput(),
+            syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+            bracketMatching(), closeBrackets(),
+            highlightSelectionMatches(), rectangularSelection(), crosshairCursor(),
+            foldGutter(),
+            keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+        ];
+        const langs = {
+            'text/x-python':     () => import('https://esm.sh/@codemirror/lang-python@6').then(m => m.python()),
+            'text/javascript':   () => import('https://esm.sh/@codemirror/lang-javascript@6').then(m => m.javascript()),
+            'application/typescript': () => import('https://esm.sh/@codemirror/lang-javascript@6').then(m => m.javascript({ typescript: true })),
+            'application/json':  () => import('https://esm.sh/@codemirror/lang-json@6').then(m => m.json()),
+            'text/css':          () => import('https://esm.sh/@codemirror/lang-css@6').then(m => m.css()),
+            'text/html':         () => import('https://esm.sh/@codemirror/lang-html@6').then(m => m.html()),
+            'text/x-markdown':   () => import('https://esm.sh/@codemirror/lang-markdown@6').then(m => m.markdown()),
+            'text/x-sql':        () => import('https://esm.sh/@codemirror/lang-sql@6').then(m => m.sql()),
+            'text/xml':          () => import('https://esm.sh/@codemirror/lang-xml@6').then(m => m.xml()),
+            'text/x-yaml':       () => import('https://esm.sh/@codemirror/lang-yaml@6').then(m => m.yaml()),
+            'text/x-sh':         () => import('https://esm.sh/@codemirror/legacy-modes@6/mode/shell').then(m => StreamLanguage.define(m.shell)),
+            'text/x-csrc':       async () => CodeMirror6._clike('c'),
+            'text/x-c++src':     async () => CodeMirror6._clike('c++'),
+            'text/x-csharp':     async () => CodeMirror6._clike('csharp'),
+            'text/x-java':       async () => CodeMirror6._clike('java'),
+            'text/x-go':         () => import('https://esm.sh/@codemirror/legacy-modes@6/mode/go').then(m => StreamLanguage.define(m.go)),
+            'text/x-rust':       () => import('https://esm.sh/@codemirror/legacy-modes@6/mode/rust').then(m => StreamLanguage.define(m.rust)),
+        };
+        async function _clike(dialect) {
+            const { c, cpp, csharp, java } = await import('https://esm.sh/@codemirror/legacy-modes@6/mode/clike');
+            return StreamLanguage.define({ c, 'c++': cpp, csharp, java }[dialect]);
+        }
+        window.CodeMirror6 = { EditorView, EditorState, Compartment, basicSetup, oneDark, langs, _clike };
+        window.dispatchEvent(new Event('cm6-ready'));
     </script>
 
     <!-- App styles -->
-    <link rel="stylesheet" href="/static/css/style.css?v=15">
-    <link rel="stylesheet" href="/static/css/themes.css?v=15">
+    <link rel="stylesheet" href="/static/css/style.css?v=17">
+    <link rel="stylesheet" href="/static/css/themes.css?v=17">
 </head>
 <body>
     <div class="app">
@@ -109,8 +161,9 @@
             </div>
 
             <div class="tabs" id="tabs">
-                <div class="tab active"><span>Meeting Notes</span><span class="close" onclick="closeTab(this)"><i class='bx bx-x'></i></span></div>
-                <div class="add-tab" onclick="addTab()"><i class='bx bx-plus'></i></div>
+                <!-- Tabs are rendered entirely by renderTabs() (ui.js); the
+                     static markup below is only the "+" button. -->
+                <div class="add-tab"><i class='bx bx-plus'></i></div>
             </div>
 
             <!-- SunEditor Container -->
@@ -130,13 +183,29 @@
             </div>
 
             <!-- Custom HTML page view: source (left) + sandboxed live preview (right).
-                 The sandbox WITHOUT allow-same-origin is the security boundary â€”
+                 The sandbox WITHOUT allow-same-origin is the security boundary —
                  pages run scripts/CDN libs but cannot touch app data/DOM. -->
             <div class="type-view hidden" id="view-page">
                 <textarea id="page-src" class="page-src" spellcheck="false"
                           placeholder="<h1>Hello</h1>&#10;<style>body{background:#1e1e2e;color:#cdd6f4}</style>&#10;<script>document.title='demo'</script>"></textarea>
                 <iframe id="page-preview" class="page-preview"
                         sandbox="allow-scripts allow-modals allow-forms"></iframe>
+            </div>
+
+            <!-- Code note view (F4): CodeMirror 6 editor + mime picker.
+                 Preview (text/html only) reuses the F1 sandbox pattern —
+                 no allow-same-origin, so page scripts stay isolated. -->
+            <div class="type-view hidden" id="view-code">
+                <div class="code-toolbar">
+                    <select id="code-mime" class="code-mime-select" title="Language"></select>
+                    <label class="code-wrap-toggle"><input type="checkbox" id="code-wrap"> Wrap</label>
+                    <button class="btn-sm hidden" id="code-preview-btn"><i class='bx bx-right-arrow-alt'></i> Preview</button>
+                </div>
+                <div class="code-body">
+                    <div id="code-editor-host" class="code-editor-host"></div>
+                    <iframe id="code-preview" class="code-preview hidden"
+                            sandbox="allow-scripts allow-modals allow-forms"></iframe>
+                </div>
             </div>
 
             <!-- Table view of the current note's children -->
@@ -191,7 +260,7 @@
                     <button onclick="sendMessage()"><i class='bx bx-send'></i></button>
                 </div>
             </div>
-            <div class="right-content hidden" id="outline-panel"><div class="empty-state-small">No outline yet â€” add headings</div></div>
+            <div class="right-content hidden" id="outline-panel"><div class="empty-state-small">No outline yet — add headings</div></div>
             <div class="right-content hidden" id="memories-panel"><div class="empty-state-small" id="memories-list">Loading memories...</div></div>
             <div class="right-content hidden" id="files-panel">
                 <div class="files-actions">
@@ -218,16 +287,17 @@
         <div class="context-menu-item" data-type="text"><i class='bx bx-file icon'></i> Text note</div>
         <div class="context-menu-item" data-type="mermaid"><i class='bx bx-sitemap icon'></i> Mermaid diagram</div>
         <div class="context-menu-item" data-type="mindMap"><i class='bx bx-network-chart icon'></i> Mind map</div>
+        <div class="context-menu-item" data-type="code"><i class='bx bx-code icon'></i> Code note</div>
     </div>
     <div class="toast-container" id="toastContainer"></div>
 
     <!-- App modules (order matters: api â†’ ui â†’ tree â†’ editor â†’ search â†’ main) -->
-    <script src="/static/js/api.js?v=15"></script>
-    <script src="/static/js/ui.js?v=15"></script>
-    <script src="/static/js/tree.js?v=15"></script>
-    <script src="/static/js/editor.js?v=15"></script>
-    <script src="/static/js/search.js?v=15"></script>
-    <script src="/static/js/main.js?v=15"></script>
+    <script src="/static/js/api.js?v=17"></script>
+    <script src="/static/js/ui.js?v=17"></script>
+    <script src="/static/js/tree.js?v=17"></script>
+    <script src="/static/js/editor.js?v=17"></script>
+    <script src="/static/js/search.js?v=17"></script>
+    <script src="/static/js/main.js?v=17"></script>
 </body>
 </html>
 

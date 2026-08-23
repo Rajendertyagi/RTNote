@@ -6,7 +6,10 @@
 let saveTimeout = null;
 
 /* ── View switching ───────────────────────────────────────────── */
-const TYPE_VIEWS = ['editor-wrap', 'view-mermaid', 'view-mindmap', 'view-page'];
+/* TYPE_VIEWS is the SINGLE owner of main-pane visibility. Every view
+   (including table-view) must route through showTypeView so views stay
+   mutually exclusive. */
+const TYPE_VIEWS = ['editor-wrap', 'view-mermaid', 'view-mindmap', 'view-page', 'view-code', 'table-view'];
 
 function showTypeView(viewId) {
     TYPE_VIEWS.forEach((id) => {
@@ -15,13 +18,28 @@ function showTypeView(viewId) {
     });
 }
 
+/* Map a note type to its view container id. */
+function viewIdForType(type) {
+    switch (type) {
+        case 'mermaid': return 'view-mermaid';
+        case 'mindMap': return 'view-mindmap';
+        case 'page': return 'view-page';
+        case 'code': return 'view-code';
+        default: return 'editor-wrap'; // text/html/webview
+    }
+}
+
 function initEditor() {
     if (typeof SUNEDITOR === 'undefined') {
         console.error('SunEditor unavailable');
         return;
     }
     App.editor = SUNEDITOR.create('#note-editor', {
+        // Keep the full registry but drop the five plugins whose required
+        // options we never provide (exportPDF/fileUpload/layout/template/math)
+        // — they log a warning each on every load otherwise.
         plugins: SUNEDITOR.plugins,
+        excludedPlugins: ['exportPDF', 'fileUpload', 'layout', 'template', 'math'],
         mode: 'classic',
         toolbar_sticky: 0,
         height: '100%',
@@ -73,6 +91,7 @@ function initEditor() {
     initMermaidView();
     initMindMapView();
     initPageView();
+    initCodeView();
 }
 
 /* Size SunEditor's content wrapper to exactly fill the pane below the toolbar,
@@ -99,6 +118,9 @@ function getContentForType(type) {
     if (type === 'page') {
         const src = document.getElementById('page-src');
         return src ? src.value : '';
+    }
+    if (type === 'code') {
+        return getCodeContent();
     }
     return editorGetContent(); // text/html/webview
 }
@@ -130,6 +152,7 @@ async function openNoteInEditor(noteId) {
         const note = await apiGetNote(noteId);
         App.currentNoteId = note.id;
         App.currentNoteType = note.type || 'text';
+        tableViewOn = false; // opening a note always returns to its own view
         setTopbar(note.title);
         updateTabTitle(note.id, note.title);
         updateBookmarkStar();
@@ -143,6 +166,9 @@ async function openNoteInEditor(noteId) {
         } else if (App.currentNoteType === 'page') {
             showTypeView('view-page');
             loadPage(note.content || '');
+        } else if (App.currentNoteType === 'code') {
+            showTypeView('view-code');
+            loadCodeNote(note);
         } else {
             showTypeView('editor-wrap');
             editorSetContent(note.content || '');
@@ -247,9 +273,26 @@ function initMindMapView() {
     /* instance created lazily on first open (needs visible container) */
 }
 
-function loadMindMap(content) {
+/* MindElixir is an async ESM CDN import — wait for its ready event like
+   CodeMirror's cm6-ready handshake, with a timeout so a failed CDN load
+   produces a controlled error instead of an empty canvas forever. */
+function ensureMindElixir() {
+    if (window.MindElixir) return Promise.resolve(true);
+    return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(false), 10000);
+        window.addEventListener('mindelixir-ready', () => {
+            clearTimeout(timer);
+            resolve(true);
+        }, { once: true });
+    });
+}
+
+async function loadMindMap(content) {
     const el = document.getElementById('mindmap-el');
-    if (!el || typeof MindElixir === 'undefined') {
+    if (!el) return;
+
+    if (!(await ensureMindElixir())) {
+        el.innerHTML = '<div class="empty-state-small">Mind map library failed to load — check your connection and reopen the note.</div>';
         showToast('Mind map library unavailable', 'error');
         return;
     }
@@ -336,4 +379,165 @@ function refreshPagePreview() {
     }
     // Cache-bust so every edit cycle reloads fresh HTML
     frame.src = '/api/notes/' + App.currentNoteId + '/raw?v=' + Date.now();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   F4/F2 — Code notes via CodeMirror 6 (loaded as ES modules in
+   index.html; language modes imported lazily per mime).
+   mime text/html gets a sandboxed live preview (F2 html code notes,
+   same isolation model as F1 pages: no allow-same-origin).
+   ═══════════════════════════════════════════════════════════════ */
+const CODE_MIMES = [
+    'text/plain', 'text/x-python', 'text/javascript', 'application/typescript',
+    'application/json', 'text/css', 'text/html', 'text/x-markdown',
+    'text/x-sql', 'text/xml', 'text/x-yaml', 'text/x-sh',
+    'text/x-csrc', 'text/x-c++src', 'text/x-csharp', 'text/x-java',
+    'text/x-go', 'text/x-rust',
+];
+const MIME_LABELS = {
+    'text/plain': 'Plain text', 'text/x-python': 'Python', 'text/javascript': 'JavaScript',
+    'application/typescript': 'TypeScript', 'application/json': 'JSON', 'text/css': 'CSS',
+    'text/html': 'HTML', 'text/x-markdown': 'Markdown', 'text/x-sql': 'SQL',
+    'text/xml': 'XML', 'text/x-yaml': 'YAML', 'text/x-sh': 'Shell',
+    'text/x-csrc': 'C', 'text/x-c++src': 'C++', 'text/x-csharp': 'C#',
+    'text/x-java': 'Java', 'text/x-go': 'Go', 'text/x-rust': 'Rust',
+};
+
+let _cmView = null;
+let _cmMime = null;
+let _cmWrap = false;
+/* Compartments let us hot-swap language/wrapping without rebuilding the view */
+let _cmLangCompartment = null;
+let _cmWrapCompartment = null;
+
+function initCodeView() {
+    const sel = document.getElementById('code-mime');
+    if (!sel) return;
+
+    for (const m of CODE_MIMES) {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = MIME_LABELS[m] || m;
+        sel.appendChild(opt);
+    }
+
+    sel.addEventListener('change', async () => {
+        _cmMime = sel.value;
+        await applyCodeLanguage();
+        updateCodePreviewButton();
+        scheduleSaveMime();
+    });
+
+    document.getElementById('code-wrap').addEventListener('change', (e) => {
+        _cmWrap = e.target.checked;
+        rebuildCodeEditor();
+    });
+
+    document.getElementById('code-preview-btn').addEventListener('click', () => {
+        const frame = document.getElementById('code-preview');
+        frame.classList.toggle('hidden');
+        document.getElementById('code-editor-host').classList.toggle('split');
+        refreshCodePreview();
+    });
+}
+
+/* Wait until the module script has exposed window.CodeMirror6 */
+function ensureCM6() {
+    if (window.CodeMirror6) return Promise.resolve();
+    return new Promise((resolve) => window.addEventListener('cm6-ready', () => resolve(), { once: true }));
+}
+
+function isDarkTheme() {
+    return !String(document.documentElement.dataset.theme || '').includes('light');
+}
+
+async function loadCodeNote(note) {
+    const sel = document.getElementById('code-mime');
+    _cmMime = note.mime && CODE_MIMES.includes(note.mime) ? note.mime : 'text/plain';
+    sel.value = _cmMime;
+    updateCodePreviewButton();
+    await ensureCM6();
+    await buildCodeEditor(note.content || '');
+}
+
+async function buildCodeEditor(docText) {
+    const { EditorView, EditorState, Compartment, basicSetup, oneDark } = window.CodeMirror6;
+    const host = document.getElementById('code-editor-host');
+
+    if (_cmView) { _cmView.destroy(); _cmView = null; }
+
+    _cmLangCompartment = new Compartment();
+    _cmWrapCompartment = new Compartment();
+
+    const extensions = [
+        basicSetup,
+        _cmWrapCompartment.of(_cmWrap ? EditorView.lineWrapping : []),
+        ...(isDarkTheme() ? [oneDark] : []),
+        _cmLangCompartment.of((await loadCodeLanguage(_cmMime)) || []),
+        EditorView.updateListener.of((update) => {
+            if (update.docChanged) scheduleSave();
+        }),
+    ];
+
+    _cmView = new EditorView({
+        state: EditorState.create({ doc: docText, extensions }),
+        parent: host,
+    });
+}
+
+/* Swap only the language extension via its compartment */
+async function applyCodeLanguage() {
+    if (!_cmView) return;
+    const langExt = (await loadCodeLanguage(_cmMime)) || [];
+    _cmView.dispatch({ effects: _cmLangCompartment.reconfigure(langExt) });
+}
+
+function rebuildCodeEditor() {
+    if (!_cmView) return;
+    const doc = getCodeContent();
+    _cmView.dispatch({
+        effects: _cmWrapCompartment.reconfigure(_cmWrap ? window.CodeMirror6.EditorView.lineWrapping : []),
+    });
+}
+
+async function loadCodeLanguage(mime) {
+    const loader = window.CodeMirror6.langs[mime];
+    if (!loader) return null;
+    try { return await loader(); } catch (e) { console.warn('CM6 language load failed:', e); return null; }
+}
+
+function getCodeContent() {
+    return _cmView ? _cmView.state.doc.toString() : '';
+}
+
+function updateCodePreviewButton() {
+    const btn = document.getElementById('code-preview-btn');
+    if (!btn) return;
+    btn.classList.toggle('hidden', _cmMime !== 'text/html');
+    if (_cmMime !== 'text/html') {
+        document.getElementById('code-preview').classList.add('hidden');
+        document.getElementById('code-editor-host').classList.remove('split');
+    }
+}
+
+function refreshCodePreview() {
+    const frame = document.getElementById('code-preview');
+    if (!frame || frame.classList.contains('hidden')) return;
+    // srcdoc keeps everything self-contained; the sandbox attribute (no
+    // allow-same-origin) is the security boundary, exactly like F1 pages.
+    frame.srcdoc = getCodeContent();
+}
+
+let _mimeSaveTimer = null;
+function scheduleSaveMime() {
+    if (!App.currentNoteId) return;
+    clearTimeout(_mimeSaveTimer);
+    _mimeSaveTimer = setTimeout(async () => {
+        try {
+            await apiUpdateNote(App.currentNoteId, { mime: _cmMime });
+            showToast('Language saved', 'success');
+        } catch (err) {
+            showToast('Failed to save language', 'error');
+        }
+    }, 400);
 }

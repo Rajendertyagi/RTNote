@@ -17,8 +17,42 @@ from app.database.notes_db import db
 
 router = APIRouter(prefix="/api", tags=["notes"])
 
-# Allowed note types — mirrors docs/ROADMAP.md (P0 + P5)
-NOTE_TYPES = {"text", "html", "page", "webview", "mermaid", "mindMap"}
+# Allowed note types — mirrors docs/ROADMAP.md (P0 + P5 + F4)
+NOTE_TYPES = {"text", "html", "page", "webview", "mermaid", "mindMap", "code"}
+
+# Curated code-note mimes — subset of Trilium's `codeNotesMimeTypes` option,
+# limited to what our CodeMirror 6 loader has a language mode for.
+CODE_MIMES = {
+    "text/plain",
+    "text/x-python",
+    "text/javascript",
+    "application/typescript",
+    "application/json",
+    "text/css",
+    "text/html",
+    "text/x-markdown",
+    "text/x-sql",
+    "text/xml",
+    "text/x-yaml",
+    "text/x-sh",
+    "text/x-csrc",
+    "text/x-c++src",
+    "text/x-csharp",
+    "text/x-java",
+    "text/x-go",
+    "text/x-rust",
+}
+
+
+def _validate_mime(note_type: str, mime) -> str | None:
+    """Code notes carry a whitelisted mime (default text/plain); other types pass through."""
+    if note_type != "code":
+        return mime
+    if not mime:
+        return "text/plain"
+    if mime not in CODE_MIMES:
+        raise HTTPException(status_code=400, detail=f"Invalid code mime '{mime}'")
+    return mime
 
 
 def _note_dict(n) -> dict:
@@ -64,6 +98,7 @@ async def create_note(data: dict):
     note_type = data.get("type", "text")
     if note_type not in NOTE_TYPES:
         raise HTTPException(status_code=400, detail=f"Invalid note type '{note_type}'")
+    mime = _validate_mime(note_type, data.get("mime"))
     with db() as conn:
         cursor = conn.execute(
             "INSERT INTO notes (title, content, parent_id, type, mime, start_date, end_date) "
@@ -73,7 +108,7 @@ async def create_note(data: dict):
                 data.get("content", ""),
                 data.get("parent_id"),
                 note_type,
-                data.get("mime"),
+                mime,
                 data.get("start_date"),
                 data.get("end_date"),
             ),
@@ -141,7 +176,7 @@ async def update_note(note_id: int, data: dict):
         title = data["title"] if "title" in data else existing["title"]
         content = data["content"] if "content" in data else existing["content"]
         note_type = data["type"] if "type" in data else existing["type"]
-        mime = data["mime"] if "mime" in data else existing["mime"]
+        mime = _validate_mime(note_type, data.get("mime") or existing["mime"])
         start_date = data["start_date"] if "start_date" in data else existing["start_date"]
         end_date = data["end_date"] if "end_date" in data else existing["end_date"]
 

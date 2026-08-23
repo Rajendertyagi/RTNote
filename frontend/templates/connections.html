@@ -1,118 +1,48 @@
-﻿/* connections.js â€” provider key/base-URL management page. */
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connections — RTW</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/chat.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css">
+</head>
+<body>
+    <div class="conn-app">
+        <header class="conn-header">
+            <h2><i class='bx bx-plug'></i> AI Connections</h2>
+            <div class="conn-header__actions">
+                <a href="/chat" class="btn-sm"><i class='bx bx-left-arrow-alt'></i> Back to chat</a>
+            </div>
+        </header>
+        <p class="conn-sub">Save API keys and base URLs per provider. Keys are stored locally in
+            <code>data/connections.json</code> and never returned unmasked by the API.</p>
 
-const $ = (id) => document.getElementById(id);
+        <div class="conn-grid" id="providerGrid"></div>
+    </div>
 
-function maskHint(entry) {
-  if (entry.api_key_masked) return `Saved: ${entry.api_key_masked}`;
-  if (!entry.needs_key && entry.base_url) return `Base URL: ${entry.base_url}`;
-  if (!entry.needs_key) return "No key needed (local)";
-  return entry.env_var ? `Falls back to env var ${entry.env_var}` : "";
-}
+    <template id="providerCardTpl">
+        <div class="conn-card">
+            <div class="conn-card__head">
+                <span class="conn-card__name"></span>
+                <span class="conn-status"></span>
+            </div>
+            <label>API key
+                <input type="password" class="conn-key" autocomplete="off" spellcheck="false">
+            </label>
+            <label>Base URL <span class="opt">(optional)</span>
+                <input type="text" class="conn-url" placeholder="https://…" spellcheck="false">
+            </label>
+            <div class="conn-card__actions">
+                <button class="btn-sm conn-save">Save</button>
+                <button class="btn-sm conn-test">Test</button>
+                <button class="btn-sm conn-del" title="Remove saved credentials"><i class='bx bx-trash'></i></button>
+                <span class="conn-result"></span>
+            </div>
+        </div>
+    </template>
 
-function render(providers) {
-  const grid = $("providerGrid");
-  const tpl = $("providerCardTpl");
-  grid.innerHTML = "";
-  for (const p of providers) {
-    const card = tpl.content.cloneNode(true);
-    const root = card.querySelector(".conn-card");
-    root.dataset.provider = p.id;
-    card.querySelector(".conn-card__name").textContent = p.label;
-
-    const status = card.querySelector(".conn-status");
-    status.textContent = p.configured ? "â— connected" : "â—‹ not connected";
-    status.classList.add(p.configured ? "ok" : "off");
-
-    const keyInput = card.querySelector(".conn-key");
-    keyInput.placeholder = p.api_key_masked || "sk-â€¦";
-    if (!p.needs_key) keyInput.closest("label").style.display = "none";
-
-    const urlInput = card.querySelector(".conn-url");
-    urlInput.value = p.base_url || "";
-
-    const result = card.querySelector(".conn-result");
-    const hint = maskHint(p);
-    if (hint) result.textContent = hint;
-
-    card.querySelector(".conn-save").onclick = () => save(root, p.id, result);
-    card.querySelector(".conn-test").onclick = () => test(root, p.id, result);
-    grid.appendChild(card);
-  }
-}
-
-async function refresh() {
-  try {
-    const r = await fetch("/api/connections", { cache: "no-store" });
-    if (!r.ok) throw new Error(`HTTP ${r.status} from /api/connections`);
-    render(await r.json());
-  } catch (e) {
-    $("providerGrid").innerHTML =
-      `<p class='conn-sub'>Failed to load connections: ${e.message}. Is the server running?</p>`;
-  }
-}
-
-async function save(card, pid, result) {
-  const body = {};
-  const key = card.querySelector(".conn-key").value.trim();
-  const url = card.querySelector(".conn-url").value.trim();
-  if (key) body.api_key = key;
-  if (url) body.base_url = url;
-  result.textContent = "Savingâ€¦";
-  try {
-    const r = await fetch(`/api/connections/${pid}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.detail || r.status);
-    result.textContent = "âœ” Saved";
-    refreshSoon();
-  } catch (e) {
-    result.textContent = `âœ– ${e.message}`;
-  }
-}
-
-async function test(card, pid, result) {
-  result.textContent = "Testingâ€¦";
-  try {
-    const r = await fetch(`/api/connections/${pid}/test`, { method: "POST", cache: "no-store" });
-    const data = await r.json();
-    result.textContent = data.ok
-      ? `âœ” OK (${data.latency_ms} ms)`
-      : `âœ– ${data.error || "failed"}`;
-  } catch (e) {
-    result.textContent = `âœ– ${e.message}`;
-  }
-}
-
-async function removeConn(card, pid, result) {
-  if (!confirm(`Remove saved credentials for ${pid}?`)) return;
-  try {
-    await fetch(`/api/connections/${pid}`, { method: "DELETE" });
-    result.textContent = "Deleted";
-    refreshSoon();
-  } catch (e) {
-    result.textContent = `âœ– ${e.message}`;
-  }
-}
-
-let refreshTimer = null;
-function refreshSoon() {
-  clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(refresh, 600);
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  refresh();
-
-  // Wire delete buttons via delegation (template cloning keeps it simple)
-  $("providerGrid").addEventListener("click", (e) => {
-    const btn = e.target.closest(".conn-del");
-    if (!btn) return;
-    const card = btn.closest(".conn-card");
-    removeConn(card, card.dataset.provider, card.querySelector(".conn-result"));
-  });
-});
-
-
+    <script src="/static/js/connections.js?v=1"></script>
+</body>
+</html>

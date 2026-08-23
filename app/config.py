@@ -23,5 +23,8 @@ CHAT_DATABASE_URL = os.getenv(
 # Provider API keys / base URLs (never committed — data/ is gitignored).
 CONNECTIONS_PATH = Path(os.getenv("CONNECTIONS_PATH", str(DATA_DIR / "connections.json")))
 
-HOST = "0.0.0.0"
-PORT = 8000
+# Bind address. 127.0.0.1 = this machine only (safe default for an app with
+# no authentication). Override with APP_HOST=0.0.0.0 to serve your LAN —
+# start.bat reads the same variable.
+HOST = os.getenv("APP_HOST", "127.0.0.1")
+PORT = int(os.getenv("APP_PORT", "8000"))

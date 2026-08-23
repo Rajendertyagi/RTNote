@@ -8,7 +8,6 @@ the fallback when nothing is saved.
 import json
 import os
 import time
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from litellm import acompletion

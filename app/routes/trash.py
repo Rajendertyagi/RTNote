@@ -81,6 +81,10 @@ async def empty_trash():
         all_ids = list(seen)
         if all_ids:
             placeholders = ",".join("?" * len(all_ids))
+            # FK enforcement is off (see notes_db), so child rows must be
+            # cleaned explicitly — otherwise erased notes leave their
+            # attachment BLOBs orphaned forever.
+            conn.execute(f"DELETE FROM attachments WHERE note_id IN ({placeholders})", all_ids)
             conn.execute(f"DELETE FROM bookmarks WHERE note_id IN ({placeholders})", all_ids)
             conn.execute(f"DELETE FROM notes WHERE id IN ({placeholders})", all_ids)
     return {"erased": len(all_ids)}

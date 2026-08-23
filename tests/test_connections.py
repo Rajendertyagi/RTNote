@@ -148,6 +148,9 @@ async def test_models_endpoint_flags_configured(client, monkeypatch):
 
 
 async def test_memory_manager_passes_saved_key(chat_db, fake_llm, monkeypatch):
+    from app.chat.db import AsyncSessionLocal
+    from app.chat.memory import MemoryManager
+
     async def _noop(self, recent):
         pass
 
@@ -155,30 +158,25 @@ async def test_memory_manager_passes_saved_key(chat_db, fake_llm, monkeypatch):
     save_connections({"anthropic": {"api_key": "ant-saved-key"}})
     calls = fake_llm(["ok"])
 
-    from app.chat.db import AsyncSessionLocal
-    from app.chat.memory import MemoryManager
-
     async with AsyncSessionLocal() as db:
         m = MemoryManager(db=db, model="anthropic/claude-opus-4-6")
         await m.load_session()
         await m.add_user_message("hi")
-        m.messages.append({"role": "assistant", "content": "r"})
-        await m._save()
+        await m.get_response()
 
     assert calls[0]["api_key"] == "ant-saved-key"
 
 
 async def test_memory_manager_no_key_when_unconfigured(chat_db, fake_llm):
-    calls = fake_llm(["ok"])
-
     from app.chat.db import AsyncSessionLocal
     from app.chat.memory import MemoryManager
+
+    calls = fake_llm(["ok"])
 
     async with AsyncSessionLocal() as db:
         m = MemoryManager(db=db, model="gpt-4o-mini")
         await m.load_session()
         await m.add_user_message("hi")
-        m.messages.append({"role": "assistant", "content": "r"})
-        await m._save()
+        await m.get_response()
 
     assert "api_key" not in calls[0]
