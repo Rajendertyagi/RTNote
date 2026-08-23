@@ -243,7 +243,7 @@ test.describe("Tree drag & drop", () => {
     await page.goto("/");
     await waitForAppBoot(page);
 
-    await html5Drag(page, `DragSrc ${u}`, `DragDst ${u}`, "over");
+    await src.dragTo(dst);
 
     // Server is the authority: verify the hierarchy changed (async completion)
     await expect
@@ -269,7 +269,7 @@ test.describe("Tree drag & drop", () => {
     await page.goto("/");
     await waitForAppBoot(page);
 
-    await html5Drag(page, `OrdC ${u}`, `OrdA ${u}`, "before");
+    await src.dragTo(dst);
 
     await expect
       .poll(
