@@ -1,6 +1,4 @@
 """Page-serving routes."""
-from pathlib import Path
-
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
