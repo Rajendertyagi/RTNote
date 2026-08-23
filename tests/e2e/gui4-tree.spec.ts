@@ -190,6 +190,43 @@ test.describe("Tree context menu & dialog", () => {
 });
 
 test.describe("Tree drag & drop", () => {
+  /* Playwright's mouse-based dragTo does not trigger Wunderbaum's HTML5
+     DnD. Dispatch real DragEvents with a DataTransfer instead — same event
+     path the extension handles, with clientY controlling the drop region
+     (top edge = before, bottom edge = after, middle = over/child). */
+  async function html5Drag(
+    page: import("@playwright/test").Page,
+    srcTitle: string,
+    dstTitle: string,
+    region: "before" | "after" | "over"
+  ) {
+    await page.evaluate(
+      ([s, d, reg]) => {
+        const rows = Array.from(document.querySelectorAll("#note-tree .wb-row"));
+        const src = rows.find((r) => (r.textContent ?? "").includes(s)) as HTMLElement;
+        const dst = rows.find((r) => (r.textContent ?? "").includes(d)) as HTMLElement;
+        if (!src || !dst) throw new Error("drag rows not found");
+        const dt = new DataTransfer();
+        const fire = (el: HTMLElement, type: string, y: number) => {
+          el.dispatchEvent(
+            new DragEvent(type, {
+              bubbles: true, cancelable: true, composed: true,
+              dataTransfer: dt, clientX: 10, clientY: y,
+            })
+          );
+        };
+        const rect = dst.getBoundingClientRect();
+        const y = reg === "before" ? rect.top + 2 : reg === "after" ? rect.bottom - 2 : rect.top + rect.height / 2;
+        fire(src, "dragstart", 0);
+        fire(dst, "dragenter", y);
+        fire(dst, "dragover", y);
+        fire(dst, "drop", y);
+        fire(src, "dragend", 0);
+      },
+      [srcTitle, dstTitle, region] as [string, string, string]
+    );
+  }
+
   test("dragging a note onto another makes it a child", async ({ page, request }) => {
     const u = uniq();
     await request.post("/api/notes", { data: { title: `DragSrc ${u}` } });
@@ -198,9 +235,7 @@ test.describe("Tree drag & drop", () => {
     await page.goto("/");
     await waitForAppBoot(page);
 
-    const src = page.locator("#note-tree .wb-row", { hasText: `DragSrc ${u}` }).first();
-    const dst = page.locator("#note-tree .wb-row", { hasText: `DragDst ${u}` }).first();
-    await src.dragTo(dst);
+    await html5Drag(page, `DragSrc ${u}`, `DragDst ${u}`, "over");
 
     // Server is the authority: verify the hierarchy changed
     const notes = await (await request.get("/api/notes")).json();
@@ -219,9 +254,7 @@ test.describe("Tree drag & drop", () => {
     await page.goto("/");
     await waitForAppBoot(page);
 
-    const src = page.locator("#note-tree .wb-row", { hasText: `OrdC ${u}` }).first();
-    const dst = page.locator("#note-tree .wb-row", { hasText: `OrdA ${u}` }).first();
-    await src.dragTo(dst);
+    await html5Drag(page, `OrdC ${u}`, `OrdA ${u}`, "before");
 
     const notes = await (await request.get("/api/notes")).json();
     const c = (notes as Array<{ title: string; position: number }>).find(
