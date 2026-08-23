@@ -32,6 +32,15 @@ function diag(page: import("@playwright/test").Page) {
   return errs.length ? ` [errors: ${errs.join(" | ")}]` : "";
 }
 
+async function traceDiag(page: import("@playwright/test").Page) {
+  const errs = (page as unknown as { _gui4Errors?: string[] })._gui4Errors ?? [];
+  const trace = await page.evaluate(() => ({
+    trace: (window as unknown as { __tTrace?: unknown[] }).__tTrace ?? [],
+    kbdBound: (window as unknown as { _treeKbdBound?: boolean })._treeKbdBound ?? null,
+  }));
+  return ` [trace: ${JSON.stringify(trace)}${errs.length ? " | errors: " + errs.join(" | ") : ""}]`;
+}
+
 /* Element-order in the tree (NOT string indexOf on joined text) */
 async function treeRowIndex(page: import("@playwright/test").Page, title: string) {
   return page.evaluate((t) => {
@@ -70,8 +79,8 @@ test.describe("Tree keyboard movement", () => {
     const k3Idx = await treeRowIndex(page, `K3 ${u}`);
     const k2Idx = await treeRowIndex(page, `K2 ${u}`);
     const k1Idx = await treeRowIndex(page, `K1 ${u}`);
-    expect(k3Idx, diag(page)).toBeLessThan(k2Idx);
-    expect(k1Idx, diag(page)).toBeLessThan(k3Idx);
+    expect(k3Idx, await traceDiag(page)).toBeLessThan(k2Idx);
+    expect(k1Idx, await traceDiag(page)).toBeLessThan(k3Idx);
 
     // Server state matches the UI
     const notes = await (await request.get("/api/notes")).json();
@@ -156,7 +165,7 @@ test.describe("Tree context menu & dialog", () => {
 
     const cmbIdx = await treeRowIndex(page, `CMB ${u}`);
     const cmaIdx = await treeRowIndex(page, `CMA ${u}`);
-    expect(cmbIdx, diag(page)).toBeLessThan(cmaIdx);
+    expect(cmbIdx, await traceDiag(page)).toBeLessThan(cmaIdx);
   });
 
   test("Move to… dialog reparents and persists across reload", async ({ page, request }) => {
