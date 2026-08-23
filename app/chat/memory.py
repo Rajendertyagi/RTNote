@@ -270,10 +270,9 @@ class MemoryManager:
 
         # Insert with DB-level unique constraint handling
         try:
-            async with self.db.begin():
-                mem = Memory(user_id=self.user_id, memory_text=memory_text)
-                self.db.add(mem)
-                await self.db.flush()  # will raise IntegrityError if duplicate
+            mem = Memory(user_id=self.user_id, memory_text=memory_text)
+            self.db.add(mem)
+            await self.db.commit()  # raises IntegrityError if duplicate
         except IntegrityError:
             logger.debug("Memory already exists (unique constraint)")
             try:
@@ -342,8 +341,8 @@ class MemoryManager:
             if not self.session_id:
                 title = self.messages[1]["content"][:50] if len(self.messages) > 1 else "New Chat"
                 new_session = ChatSession(title=title, messages=json.dumps(self.messages))
-                async with self.db.begin():
-                    self.db.add(new_session)
+                self.db.add(new_session)
+                await self.db.commit()
                 # refresh to obtain id
                 await self.db.refresh(new_session)
                 self.session_id = new_session.id
@@ -352,8 +351,7 @@ class MemoryManager:
                 if session:
                     session.messages = json.dumps(self.messages)
                     session.updated_at = datetime.now(timezone.utc)
-                    async with self.db.begin():
-                        self.db.add(session)
+                    await self.db.commit()
         except Exception:
             logger.exception("Failed to save session")
             try:

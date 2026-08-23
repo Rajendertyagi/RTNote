@@ -38,6 +38,10 @@ Base = declarative_base()
 
 async def init_db():
     """Create database tables from SQLAlchemy models."""
+    # Import models so they register with Base before create_all runs
+    # (otherwise a fresh database gets no tables and trigger creation fails).
+    from app.chat import memory as _models  # noqa: F401
+
     async with engine.begin() as conn:
         # Create tables
         await conn.run_sync(Base.metadata.create_all)

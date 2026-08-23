@@ -1,4 +1,9 @@
-"""Centralized paths and settings. Everything derives from BASE_DIR."""
+"""Centralized paths and settings. Everything derives from BASE_DIR.
+
+DB locations can be overridden via env vars (NOTES_DB_PATH,
+CHAT_DATABASE_URL) so tests/CI can point them at temp files.
+"""
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent   # project root
@@ -10,8 +15,11 @@ DATA_DIR = BASE_DIR / "data"
 
 DATA_DIR.mkdir(exist_ok=True)
 
-NOTES_DB_PATH = DATA_DIR / "notes.db"
-CHAT_DATABASE_URL = f"sqlite+aiosqlite:///{(DATA_DIR / 'chat.db').as_posix()}"
+NOTES_DB_PATH = Path(os.getenv("NOTES_DB_PATH", str(DATA_DIR / "notes.db")))
+CHAT_DATABASE_URL = os.getenv(
+    "CHAT_DATABASE_URL",
+    f"sqlite+aiosqlite:///{(DATA_DIR / 'chat.db').as_posix()}",
+)
 
 HOST = "0.0.0.0"
 PORT = 8000

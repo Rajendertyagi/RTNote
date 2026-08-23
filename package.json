@@ -1,0 +1,8 @@
+{
+  "name": "trilium-starlette-tests",
+  "private": true,
+  "description": "Playwright E2E tests (run in CI only)",
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
