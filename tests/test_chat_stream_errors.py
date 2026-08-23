@@ -1,5 +1,5 @@
-"""Stream error paths: LLM failure and timeout must degrade to a friendly
-fallback delta (never a 500), and the session must still be persisted."""
+"""Stream error paths: LLM failure and timeout must emit a structured
+`error` SSE event (never a 500, never a fake assistant message)."""
 import json
 
 from app.chat.db import AsyncSessionLocal
@@ -19,7 +19,7 @@ async def _no_background(self, recent):
     pass
 
 
-async def test_stream_llm_failure_yields_fallback_not_500(client, chat_db, monkeypatch):
+async def test_stream_llm_failure_emits_error_event_not_500(client, chat_db, monkeypatch):
     async def _boom(**kwargs):
         raise RuntimeError("provider exploded")
 
@@ -32,20 +32,20 @@ async def test_stream_llm_failure_yields_fallback_not_500(client, chat_db, monke
 
     events = _parse_sse(res.text)
     assert events[0]["type"] == "meta"
-    deltas = "".join(e["text"] for e in events if e["type"] == "delta")
-    assert "trouble generating" in deltas
+    assert not [e for e in events if e["type"] == "delta"]  # no fake content
+    errors = [e for e in events if e["type"] == "error"]
+    assert len(errors) == 1 and "failed" in errors[0]["text"].lower()
     assert events[-1] == {"type": "done"}
 
-    # The fallback reply is persisted so history stays coherent
+    # The error text is NOT persisted as an assistant message
     sid = events[0]["session_id"]
     async with AsyncSessionLocal() as db:
         row = await db.get(ChatSession, sid)
         stored = json.loads(row.messages)
-    assert stored[-1]["role"] == "assistant"
-    assert "trouble generating" in stored[-1]["content"]
+    assert stored[-1]["role"] == "user"
 
 
-async def test_stream_timeout_yields_timeout_fallback(client, chat_db, monkeypatch):
+async def test_stream_timeout_emits_error_event(client, chat_db, monkeypatch):
     import asyncio
 
     async def _timeout(**kwargs):
@@ -58,7 +58,7 @@ async def test_stream_timeout_yields_timeout_fallback(client, chat_db, monkeypat
 
     res = await client.post("/api/chat/stream", json={"message": "hi"})
     assert res.status_code == 200
-    deltas = "".join(
-        e["text"] for e in _parse_sse(res.text) if e["type"] == "delta"
-    )
-    assert "timeout" in deltas
+    events = _parse_sse(res.text)
+    assert not [e for e in events if e["type"] == "delta"]
+    errors = [e for e in events if e["type"] == "error"]
+    assert len(errors) == 1 and "too long" in errors[0]["text"]

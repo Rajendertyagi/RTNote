@@ -11,7 +11,7 @@ from sqlalchemy import select, delete
 from typing import Optional, List
 
 from app.chat.db import AsyncSessionLocal  # your async session factory
-from app.chat.memory import MemoryManager, ChatSession, Memory
+from app.chat.memory import MemoryManager, ChatSession, Memory, ChatStreamError
 from pydantic import BaseModel, Field
 
 import json
@@ -37,6 +37,7 @@ class SendMessageRequest(BaseModel):
 class SendMessageResponse(BaseModel):
     session_id: int
     reply: str
+    error: Optional[str] = None  # set when generation failed (reply is empty)
 
 
 class SessionOut(BaseModel):
@@ -82,13 +83,15 @@ async def send_message(
     )
     await manager.load_session()
     await manager.add_user_message(request.message)
-
-    # Generate reply (manager handles saving and background extraction)
-    reply = await manager.get_response()
-
-    # session_id should be set after save
-    if not manager.session_id:
+    # Persist the user message before generating so it survives failures.
+    session_id = await manager.ensure_session()
+    if not session_id:
         raise HTTPException(status_code=500, detail="Failed to create or persist chat session")
+
+    try:
+        reply = await manager.get_response()
+    except ChatStreamError as exc:
+        return SendMessageResponse(session_id=session_id, reply="", error=str(exc))
 
     return SendMessageResponse(session_id=manager.session_id, reply=reply)
 
@@ -100,6 +103,7 @@ async def stream_message(request: SendMessageRequest, db: AsyncSession = Depends
     Events:
       data: {"type": "meta",  "session_id": N}   — sent first
       data: {"type": "delta", "text": "..."}     — repeated text chunks
+      data: {"type": "error", "text": "..."}     — generation failure (terminal)
       data: {"type": "done"}                     — final event
     """
     manager = MemoryManager(
@@ -118,8 +122,11 @@ async def stream_message(request: SendMessageRequest, db: AsyncSession = Depends
 
     async def event_stream():
         yield f"data: {json.dumps({'type': 'meta', 'session_id': session_id})}\n\n"
-        async for delta in manager.stream_response():
-            yield f"data: {json.dumps({'type': 'delta', 'text': delta})}\n\n"
+        try:
+            async for delta in manager.stream_response():
+                yield f"data: {json.dumps({'type': 'delta', 'text': delta})}\n\n"
+        except ChatStreamError as exc:
+            yield f"data: {json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     return StreamingResponse(

@@ -199,6 +199,7 @@ async function saveNoteNow() {
 }
 
 async function createNewNote(type) {
+    await App.bootReady; // never race the boot-time tab restore
     try {
         const note = await apiCreateNote('Untitled Note', null, type || 'text');
         await refreshTree();
@@ -441,10 +442,63 @@ function initCodeView() {
     });
 }
 
-/* Wait until the module script has exposed window.CodeMirror6 */
+/* CodeMirror 6 is loaded LAZILY on first code-note open — never at boot.
+   (Module scripts delay DOMContentLoaded until their import graph resolves;
+   boot-time CDN imports would stall the whole app on a slow network.)
+   The `codemirror` meta-package resolves to a UMD build on esm.sh, so
+   basicSetup is composed from the scoped packages instead. */
+let _cm6Promise = null;
+
 function ensureCM6() {
     if (window.CodeMirror6) return Promise.resolve();
-    return new Promise((resolve) => window.addEventListener('cm6-ready', () => resolve(), { once: true }));
+    if (!_cm6Promise) _cm6Promise = _loadCM6();
+    return _cm6Promise;
+}
+
+async function _loadCM6() {
+    const { EditorView } = await import('https://esm.sh/@codemirror/view@6');
+    const { EditorState, Compartment } = await import('https://esm.sh/@codemirror/state@6');
+    const { defaultKeymap, history, historyKeymap } = await import('https://esm.sh/@codemirror/commands@6');
+    const { foldGutter, indentOnInput, syntaxHighlighting, defaultHighlightStyle,
+            bracketMatching, StreamLanguage } = await import('https://esm.sh/@codemirror/language@6');
+    const { closeBrackets } = await import('https://esm.sh/@codemirror/autocomplete@6');
+    const { searchKeymap, highlightSelectionMatches } = await import('https://esm.sh/@codemirror/search@6');
+    const { oneDark } = await import('https://esm.sh/@codemirror/theme-one-dark@6');
+
+    const basicSetup = [
+        lineNumbers(), highlightSpecialChars(), history(), drawSelection(), dropCursor(),
+        EditorState.allowMultipleSelections.of(true),
+        indentOnInput(),
+        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        bracketMatching(), closeBrackets(),
+        highlightSelectionMatches(), rectangularSelection(), crosshairCursor(),
+        foldGutter(),
+        keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+    ];
+    const langs = {
+        'text/x-python':     () => import('https://esm.sh/@codemirror/lang-python@6').then(m => m.python()),
+        'text/javascript':   () => import('https://esm.sh/@codemirror/lang-javascript@6').then(m => m.javascript()),
+        'application/typescript': () => import('https://esm.sh/@codemirror/lang-javascript@6').then(m => m.javascript({ typescript: true })),
+        'application/json':  () => import('https://esm.sh/@codemirror/lang-json@6').then(m => m.json()),
+        'text/css':          () => import('https://esm.sh/@codemirror/lang-css@6').then(m => m.css()),
+        'text/html':         () => import('https://esm.sh/@codemirror/lang-html@6').then(m => m.html()),
+        'text/x-markdown':   () => import('https://esm.sh/@codemirror/lang-markdown@6').then(m => m.markdown()),
+        'text/x-sql':        () => import('https://esm.sh/@codemirror/lang-sql@6').then(m => m.sql()),
+        'text/xml':          () => import('https://esm.sh/@codemirror/lang-xml@6').then(m => m.xml()),
+        'text/x-yaml':       () => import('https://esm.sh/@codemirror/lang-yaml@6').then(m => m.yaml()),
+        'text/x-sh':         () => import('https://esm.sh/@codemirror/legacy-modes@6/mode/shell').then(m => StreamLanguage.define(m.shell)),
+        'text/x-csrc':       async () => _clike('c'),
+        'text/x-c++src':     async () => _clike('c++'),
+        'text/x-csharp':     async () => _clike('csharp'),
+        'text/x-java':       async () => _clike('java'),
+        'text/x-go':         () => import('https://esm.sh/@codemirror/legacy-modes@6/mode/go').then(m => StreamLanguage.define(m.go)),
+        'text/x-rust':       () => import('https://esm.sh/@codemirror/legacy-modes@6/mode/rust').then(m => StreamLanguage.define(m.rust)),
+    };
+    async function _clike(dialect) {
+        const { c, cpp, csharp, java } = await import('https://esm.sh/@codemirror/legacy-modes@6/mode/clike');
+        return StreamLanguage.define({ c, 'c++': cpp, csharp, java }[dialect]);
+    }
+    window.CodeMirror6 = { EditorView, EditorState, Compartment, basicSetup, oneDark, langs };
 }
 
 function isDarkTheme() {

@@ -20,9 +20,27 @@ from litellm import acompletion
 
 # Shared DB objects
 from app.chat.db import Base, AsyncSessionLocal
+from app.config import CHAT_HISTORY_LIMIT
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+
+
+class ChatStreamError(Exception):
+    """User-facing LLM failure. Never persisted as an assistant message."""
+
+
+def friendly_error(exc: Exception) -> str:
+    """Short user-facing message for an LLM failure (no stack traces)."""
+    s = str(exc)
+    low = s.lower()
+    if "401" in s or "unauthorized" in low or "invalid api key" in low or "authentication" in low:
+        return "Authentication failed — check the saved API key for this provider."
+    if "429" in s or "rate limit" in low:
+        return "Rate limited by the provider — try again shortly."
+    if "timeout" in low or "timed out" in low:
+        return "The model took too long to respond."
+    return f"Model request failed: {s[:200]}"
 
 
 # ---------- Models ----------
@@ -143,6 +161,19 @@ class MemoryManager:
             content = f"{content}\n\n{att_text}"
         self.messages.append({"role": "user", "content": content})
 
+    def _llm_messages(self) -> List[dict]:
+        """Messages sent to the LLM: system prompt + last CHAT_HISTORY_LIMIT turns.
+
+        Full history stays in self.messages (and the DB); older turns are
+        only trimmed from the wire payload to control token cost.
+        """
+        msgs = self.messages
+        if len(msgs) <= CHAT_HISTORY_LIMIT:
+            return list(msgs)
+        head = [msgs[0]] if msgs and msgs[0].get("role") == "system" else []
+        tail = msgs[-(CHAT_HISTORY_LIMIT - len(head)):]
+        return head + tail
+
     def _completion_kwargs(self, **extra) -> dict:
         """Common kwargs for LLM calls; reasoning_effort only when set.
 
@@ -151,7 +182,7 @@ class MemoryManager:
         """
         kwargs = {
             "model": self.model,
-            "messages": self.messages,
+            "messages": self._llm_messages(),
             "temperature": 0.2,
         }
         if self.reasoning_effort:
@@ -205,19 +236,20 @@ class MemoryManager:
                             },
                         )
 
-        # 2. Call LLM (async, with timeout)
+        # 2. Call LLM (async, with timeout). Failures raise ChatStreamError
+        # so the caller can surface a structured error — nothing is persisted.
         try:
             response = await asyncio.wait_for(
                 acompletion(**self._completion_kwargs()),
                 timeout=60,
             )
-            assistant_reply = response.choices[0].message.content
+            assistant_reply = response.choices[0].message.content or ""
         except asyncio.TimeoutError:
             logger.exception("LLM call timed out")
-            assistant_reply = "Sorry, I couldn't generate a response right now due to a timeout."
-        except Exception:
+            raise ChatStreamError("The model took too long to respond.")
+        except Exception as exc:
             logger.exception("LLM call failed")
-            assistant_reply = "Sorry, I had trouble generating a response right now."
+            raise ChatStreamError(friendly_error(exc)) from exc
 
         # 3. Append assistant reply and save session
         self.messages.append({"role": "assistant", "content": assistant_reply})
@@ -274,14 +306,20 @@ class MemoryManager:
 
         The caller must have called ensure_session() first so the client can
         track the session id while deltas are still streaming.
+
+        Raises ChatStreamError when the LLM call fails — the caller emits a
+        structured error event and nothing is persisted as an assistant
+        message. If the client disconnects mid-stream (GeneratorExit or task
+        cancellation), whatever already streamed is persisted best-effort.
         """
+        parts: List[str] = []
+        persisted = False
         try:
             await self._augment_with_memories()
             response = await asyncio.wait_for(
                 acompletion(**self._completion_kwargs(stream=True)),
                 timeout=120,
             )
-            parts: List[str] = []
             async for chunk in response:
                 delta = ""
                 try:
@@ -292,28 +330,61 @@ class MemoryManager:
                     parts.append(delta)
                     yield delta
             reply = "".join(parts) or "(empty response)"
+            self.messages.append({"role": "assistant", "content": reply})
+            await self._save()
+            persisted = True
+            if self.auto_extract:
+                recent = self.messages[-8:]
+                asyncio.create_task(self._extract_memories_background(recent))
         except asyncio.TimeoutError:
             logger.exception("LLM stream timed out")
-            reply = "Sorry, I couldn't generate a response right now due to a timeout."
-            yield reply
-        except Exception:
+            raise ChatStreamError("The model took too long to respond.")
+        except Exception as exc:
             logger.exception("LLM stream failed")
-            reply = "Sorry, I had trouble generating a response right now."
-            yield reply
-
-        self.messages.append({"role": "assistant", "content": reply})
-        await self._save()
-
-        if self.auto_extract:
-            recent = self.messages[-8:]
-            asyncio.create_task(self._extract_memories_background(recent))
+            raise ChatStreamError(friendly_error(exc)) from exc
+        finally:
+            if not persisted and parts:
+                # Client disconnected or upstream failed mid-stream: keep
+                # whatever reached the user instead of losing it.
+                self.messages.append({"role": "assistant", "content": "".join(parts)})
+                task = asyncio.ensure_future(self._save())
+                try:
+                    await asyncio.shield(task)
+                except asyncio.CancelledError:
+                    pass  # shield raised; the save continues in the background
+                except Exception:
+                    logger.exception("Failed to persist partial stream reply")
 
     # ----------------- Background extraction -----------------
+    def _resolve_memory_model(self) -> Optional[str]:
+        """Pick a cheap, known-working model from the provider behind self.model.
+
+        Returns None when that provider has no usable credentials, so callers
+        can skip extraction instead of firing doomed background LLM calls.
+        """
+        try:
+            from app.chat.connections import PROVIDERS, is_configured, provider_for_model
+
+            pid = provider_for_model(self.model)
+            if pid and is_configured(pid):
+                return PROVIDERS[pid]["test_model"]
+        except Exception:
+            logger.debug("Provider resolution failed; skipping memory extraction")
+        return None
+
     async def _extract_memories_background(self, recent_messages: List[dict]):
-        """Run extraction in a separate task, using a fresh DB session."""
+        """Run extraction in a separate task, using a fresh DB session.
+
+        Skipped entirely when the active provider has no credentials —
+        extraction must never produce silent failing calls.
+        """
+        model = self._resolve_memory_model()
+        if not model:
+            logger.debug("Memory extraction skipped: provider not configured")
+            return
         try:
             async with AsyncSessionLocal() as db:
-                extractor = MemoryManager(db=db, user_id=self.user_id, memory_model=self.memory_model)
+                extractor = MemoryManager(db=db, user_id=self.user_id, memory_model=model)
                 await asyncio.wait_for(
                     extractor._extract_memories(recent_messages),
                     timeout=self.extraction_timeout,

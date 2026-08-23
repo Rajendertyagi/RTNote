@@ -29,6 +29,13 @@ function render(providers) {
 
     const urlInput = card.querySelector(".conn-url");
     urlInput.value = p.base_url || "";
+    urlInput.dataset.orig = p.base_url || "";
+
+    const clearKeyBtn = card.querySelector(".conn-clear-key");
+    if (clearKeyBtn) {
+      clearKeyBtn.hidden = !p.api_key_masked;
+      clearKeyBtn.onclick = () => clearKey(root, p.id, result);
+    }
 
     const result = card.querySelector(".conn-result");
     const hint = maskHint(p);
@@ -53,10 +60,17 @@ async function refresh() {
 
 async function save(card, pid, result) {
   const body = {};
-  const key = card.querySelector(".conn-key").value.trim();
-  const url = card.querySelector(".conn-url").value.trim();
+  const keyInput = card.querySelector(".conn-key");
+  const urlInput = card.querySelector(".conn-url");
+  const key = keyInput.value.trim();
+  const url = urlInput.value.trim();
+  // Only send fields the user actually changed; the API treats "" as "clear".
   if (key) body.api_key = key;
-  if (url) body.base_url = url;
+  if (url !== (urlInput.dataset.orig || "")) body.base_url = url;
+  if (!Object.keys(body).length) {
+    result.textContent = "Nothing changed";
+    return;
+  }
   result.textContent = "Saving…";
   try {
     const r = await fetch(`/api/connections/${pid}`, {
@@ -81,6 +95,22 @@ async function test(card, pid, result) {
     result.textContent = data.ok
       ? `✔ OK (${data.latency_ms} ms)`
       : `✖ ${data.error || "failed"}`;
+  } catch (e) {
+    result.textContent = `✖ ${e.message}`;
+  }
+}
+
+async function clearKey(card, pid, result) {
+  result.textContent = "Clearing…";
+  try {
+    const r = await fetch(`/api/connections/${pid}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: "" }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    result.textContent = "✔ Key cleared";
+    refreshSoon();
   } catch (e) {
     result.textContent = `✖ ${e.message}`;
   }

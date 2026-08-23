@@ -61,6 +61,7 @@ async function activateTab(noteId) {
 }
 
 async function openNoteInTab(noteId) {
+    await App.bootReady; // never race the boot-time tab restore
     noteId = Number(noteId);
     if (isNaN(noteId)) return;
     if (!TabState.open.some((t) => t.id === noteId)) {

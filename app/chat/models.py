@@ -22,14 +22,14 @@ MODELS = [
         "name": "GPT-5.4 Mini",
         "provider": "OpenAI",
         "description": "Fast reasoning model",
-        "efforts": ["minimal", "low", "medium", "high"],
+        "efforts": ["low", "medium", "high", "xhigh"],
     },
     {
         "id": "gpt-5.4",
         "name": "GPT-5.4",
         "provider": "OpenAI",
         "description": "Flagship general model",
-        "efforts": ["minimal", "low", "medium", "high"],
+        "efforts": ["low", "medium", "high", "xhigh"],
     },
     {
         "id": "anthropic/claude-sonnet-4-6",
@@ -59,6 +59,7 @@ EFFORT_LABELS = {
     "low": "Low",
     "medium": "Medium",
     "high": "High",
+    "xhigh": "Max+",
     "max": "Max",
 }
 

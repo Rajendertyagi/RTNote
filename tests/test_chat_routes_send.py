@@ -77,7 +77,7 @@ async def test_send_missing_body_422(client):
     assert (await client.post("/api/chat/send", json={})).status_code == 422
 
 
-async def test_llm_timeout_returns_fallback_text(client, chat_db, monkeypatch):
+async def test_llm_timeout_returns_error_field_not_persisted(client, chat_db, monkeypatch):
     async def _no_background(self, recent):
         pass
 
@@ -90,10 +90,18 @@ async def test_llm_timeout_returns_fallback_text(client, chat_db, monkeypatch):
 
     res = await client.post("/api/chat/send", json={"message": "slow"})
     assert res.status_code == 200
-    assert "timeout" in res.json()["reply"].lower()
+    body = res.json()
+    assert "too long" in body["error"].lower()
+    assert body["reply"] == ""
+
+    # The user message survives; no fake assistant reply is stored
+    async with AsyncSessionLocal() as db:
+        row = await db.get(ChatSession, body["session_id"])
+        stored = json.loads(row.messages)
+    assert [m["role"] for m in stored] == ["system", "user"]
 
 
-async def test_llm_generic_failure_returns_fallback_text(client, chat_db, monkeypatch):
+async def test_llm_generic_failure_returns_error_field_not_persisted(client, chat_db, monkeypatch):
     async def _no_background(self, recent):
         pass
 
@@ -106,7 +114,9 @@ async def test_llm_generic_failure_returns_fallback_text(client, chat_db, monkey
 
     res = await client.post("/api/chat/send", json={"message": "hi"})
     assert res.status_code == 200
-    assert "trouble" in res.json()["reply"].lower()
+    body = res.json()
+    assert "trouble" in body["error"].lower() or "failed" in body["error"].lower()
+    assert body["reply"] == ""
 
 
 async def test_memory_context_injected_into_prompt(client, chat_db, fake_llm, monkeypatch):

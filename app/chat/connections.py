@@ -106,6 +106,8 @@ def mask_key(key: str | None) -> str | None:
 
 def is_configured(provider: str) -> bool:
     meta = PROVIDERS[provider]
+    if not meta["needs_key"]:
+        return True  # keyless providers (e.g. Ollama) always usable
     creds = get_creds(provider)
     if creds.get("api_key") or creds.get("base_url"):
         return True
