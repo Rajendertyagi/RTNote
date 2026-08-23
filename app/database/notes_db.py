@@ -39,6 +39,9 @@ def get_db():
     conn = sqlite3.connect(NOTES_DB_PATH, timeout=10.0)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=10000")
+    # Recommended WAL pairing (sqlite.org): safe vs app crashes, tiny
+    # durability window only on OS/power loss.
+    conn.execute("PRAGMA synchronous=NORMAL")
     conn.row_factory = sqlite3.Row
     return conn
 

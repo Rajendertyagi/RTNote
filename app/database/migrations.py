@@ -123,6 +123,13 @@ def _m007_fix_fts_triggers(conn):
     conn.execute("INSERT INTO notes_fts(notes_fts) VALUES('rebuild')")
 
 
+def _m008_performance_indexes(conn):
+    """Best-practice indexes: parent_id (tree build + subtree BFS),
+    start_date (calendar range scans)."""
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_notes_parent ON notes(parent_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_notes_start ON notes(start_date)")
+
+
 MIGRATIONS.extend([
     (2, "notes_soft_delete", _m002_notes_soft_delete),
     (3, "options_table", _m003_options_table),
@@ -130,6 +137,7 @@ MIGRATIONS.extend([
     (5, "notes_event_dates", _m005_notes_event_dates),
     (6, "attachments_table", _m006_attachments_table),
     (7, "fix_fts_triggers", _m007_fix_fts_triggers),
+    (8, "performance_indexes", _m008_performance_indexes),
 ])
 
 
