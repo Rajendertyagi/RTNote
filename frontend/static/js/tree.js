@@ -380,20 +380,33 @@ async function refreshTree() {
         _notesCache = await apiListNotes();
         _treeReloadGuard = true;
         const src = buildTreeSource(_notesCache);
-        let rebuilt = false;
+
+        // Expected flat row order from the source tree
+        const want = [];
+        const walk = (nodes) => nodes.forEach((n) => {
+            want.push(String(n.title).trim());
+            if (n.children) walk(n.children);
+        });
+        walk(src);
+
+        let ok = false;
         try {
             const p = tree.reload(src);
             if (p && typeof p.then === 'function') await p;
-            rebuilt = document.querySelector('#note-tree .wb-row') !== null;
+            const got = Array.from(document.querySelectorAll('#note-tree .wb-row'))
+                .map((r) => (r.textContent || '').trim());
+            // reload() may keep existing node order — only accept a DOM that
+            // actually matches the new hierarchy.
+            ok = JSON.stringify(got) === JSON.stringify(want);
         } catch (err) {
             console.warn('tree.reload unavailable/failed — rebuilding', err);
         }
-        if (!rebuilt) {
+
+        if (!ok) {
             // Fallback: full rebuild through the single init choke point.
             if (typeof tree.destroy === 'function') tree.destroy();
             el0().innerHTML = '';
             await initTree();
-            rebuilt = document.querySelector('#note-tree .wb-row') !== null;
         }
         setTimeout(() => { _treeReloadGuard = false; }, 250);
     } catch (err) {

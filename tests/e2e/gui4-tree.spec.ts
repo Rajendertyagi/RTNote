@@ -16,7 +16,7 @@ test.beforeEach(async ({ page, request }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
   page.on("response", (r) => {
-    if (r.url().includes("/move") && !r.ok()) errors.push(`move ${r.status()}`);
+    if (r.url().includes("/move")) errors.push(`move ${r.status()}`);
   });
   (page as unknown as { _gui4Errors: string[] })._gui4Errors = errors;
 
