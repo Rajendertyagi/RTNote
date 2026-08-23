@@ -15,13 +15,34 @@ async function jumpTo(page: import("@playwright/test").Page, title: string) {
   await page.locator("#quickSearchInput").fill(title);
   const first = page.locator("#quickSearchResults .qs-result").first();
   await expect(first).toContainText(title, { timeout: 10000 }); // title boost ranks it first
+  const diag = await page.evaluate(() => ({
+    results: (typeof quickSearchResults !== "undefined" ? quickSearchResults : []).map(
+      (r: { id: number; title: string }) => `${r.id}:${r.title}`
+    ),
+  }));
   await page.keyboard.press("Enter");
-  await expect(page.locator("#topbar-title")).toContainText(title, { timeout: 10000 });
+  await expect(
+    page.locator("#topbar-title"),
+    `after Enter on ${JSON.stringify(diag)}`
+  ).toContainText(title, { timeout: 10000 });
 }
 
 async function openFromTree(page: import("@playwright/test").Page, title: string) {
   await page.locator("#note-tree .wb-row", { hasText: title }).first().click();
-  await expect(page.locator("#topbar-title")).toContainText(title, { timeout: 10000 });
+  const diag = await page.evaluate(() => {
+    const t = mar10.Wunderbaum.getTree("note-tree");
+    return {
+      active: t && t.getActiveNode ? String(t.getActiveNode()?.key ?? "null") : "no-tree",
+      guard: typeof _treeReloadGuard !== "undefined" ? String(_treeReloadGuard) : "?",
+      rows: Array.from(document.querySelectorAll("#note-tree .wb-row"))
+        .slice(0, 8)
+        .map((r) => r.textContent?.trim()),
+    };
+  });
+  await expect(
+    page.locator("#topbar-title"),
+    `tree diag after click: ${JSON.stringify(diag)}`
+  ).toContainText(title, { timeout: 10000 });
 }
 
 test.describe("Navigation history", () => {
