@@ -1,4 +1,4 @@
-/* connections.js — provider key/base-URL management page. */
+﻿/* connections.js â€” provider key/base-URL management page. */
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,11 +20,11 @@ function render(providers) {
     card.querySelector(".conn-card__name").textContent = p.label;
 
     const status = card.querySelector(".conn-status");
-    status.textContent = p.configured ? "● connected" : "○ not connected";
+    status.textContent = p.configured ? "â— connected" : "â—‹ not connected";
     status.classList.add(p.configured ? "ok" : "off");
 
     const keyInput = card.querySelector(".conn-key");
-    keyInput.placeholder = p.api_key_masked || "sk-…";
+    keyInput.placeholder = p.api_key_masked || "sk-â€¦";
     if (!p.needs_key) keyInput.closest("label").style.display = "none";
 
     const urlInput = card.querySelector(".conn-url");
@@ -42,7 +42,7 @@ function render(providers) {
 
 async function refresh() {
   try {
-    const r = await fetch("/api/connections");
+    const r = await fetch("/api/connections", { cache: "no-store" });
     if (!r.ok) throw new Error(`HTTP ${r.status} from /api/connections`);
     render(await r.json());
   } catch (e) {
@@ -57,7 +57,7 @@ async function save(card, pid, result) {
   const url = card.querySelector(".conn-url").value.trim();
   if (key) body.api_key = key;
   if (url) body.base_url = url;
-  result.textContent = "Saving…";
+  result.textContent = "Savingâ€¦";
   try {
     const r = await fetch(`/api/connections/${pid}`, {
       method: "PUT",
@@ -66,23 +66,23 @@ async function save(card, pid, result) {
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || r.status);
-    result.textContent = "✔ Saved";
+    result.textContent = "âœ” Saved";
     refreshSoon();
   } catch (e) {
-    result.textContent = `✖ ${e.message}`;
+    result.textContent = `âœ– ${e.message}`;
   }
 }
 
 async function test(card, pid, result) {
-  result.textContent = "Testing…";
+  result.textContent = "Testingâ€¦";
   try {
-    const r = await fetch(`/api/connections/${pid}/test`, { method: "POST" });
+    const r = await fetch(`/api/connections/${pid}/test`, { method: "POST", cache: "no-store" });
     const data = await r.json();
     result.textContent = data.ok
-      ? `✔ OK (${data.latency_ms} ms)`
-      : `✖ ${data.error || "failed"}`;
+      ? `âœ” OK (${data.latency_ms} ms)`
+      : `âœ– ${data.error || "failed"}`;
   } catch (e) {
-    result.textContent = `✖ ${e.message}`;
+    result.textContent = `âœ– ${e.message}`;
   }
 }
 
@@ -93,7 +93,7 @@ async function removeConn(card, pid, result) {
     result.textContent = "Deleted";
     refreshSoon();
   } catch (e) {
-    result.textContent = `✖ ${e.message}`;
+    result.textContent = `âœ– ${e.message}`;
   }
 }
 
@@ -114,3 +114,4 @@ document.addEventListener("DOMContentLoaded", () => {
     removeConn(card, card.dataset.provider, card.querySelector(".conn-result"));
   });
 });
+
