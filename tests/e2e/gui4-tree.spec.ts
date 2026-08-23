@@ -44,7 +44,16 @@ function treeOrder(page: import("@playwright/test").Page) {
 
 async function openInTree(page: import("@playwright/test").Page, title: string) {
   await page.locator("#note-tree .wb-row", { hasText: title }).first().click();
-  await expect(page.locator("#topbar-title"), title + diag(page)).toContainText(title, { timeout: 10000 });
+  await expect(page.locator("#topbar-title")).toContainText(title, { timeout: 10000 });
+}
+
+async function jumpTo(page: import("@playwright/test").Page, title: string) {
+  await page.keyboard.press("Control+k");
+  const resp = page.waitForResponse((r) => r.url().includes("/api/search"), { timeout: 10000 });
+  await page.locator("#quickSearchInput").fill(title);
+  await resp;
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#topbar-title")).toContainText(title, { timeout: 10000 });
 }
 
 test.describe("Tree keyboard movement", () => {
@@ -61,10 +70,19 @@ test.describe("Tree keyboard movement", () => {
     await page.keyboard.press("Control+ArrowUp");
     await expect(page.locator("#topbar-title")).toContainText(`K3 ${u}`); // stays open
 
+    const navDiag = await page.evaluate(() => ({
+      hist: NavHistory.debug(),
+      active: document.activeElement?.tagName,
+      inTree: document.getElementById("note-tree").contains(document.activeElement),
+      rows: Array.from(document.querySelectorAll("#note-tree .wb-row")).map((r) => r.textContent?.trim()),
+      cache: (typeof _notesCache !== "undefined" ? _notesCache : []).map((n: { title: string; parent_id: number | null; position: number | null }) => `${n.title}:p${n.parent_id},pos${n.position}`),
+    }));
+    // Order assertions carry full diagnostics for any residual failure
     const order = (await treeOrder(page)).join("|");
-    expect(order.indexOf(`K3 ${u}`)).toBeGreaterThan(-1);
-    expect(order.indexOf(`K3 ${u}`)).toBeLessThan(order.indexOf(`K2 ${u}`));
-    expect(order.indexOf(`K1 ${u}`)).toBeLessThan(order.indexOf(`K3 ${u}`));
+    const msg = `kbd diag: ${JSON.stringify(navDiag)} | dom order: ${order}`;
+    expect(order.indexOf(`K3 ${u}`) > -1, msg).toBe(true);
+    expect(order.indexOf(`K3 ${u}`), msg).toBeLessThan(order.indexOf(`K2 ${u}`));
+    expect(order.indexOf(`K1 ${u}`), msg).toBeLessThan(order.indexOf(`K3 ${u}`));
 
     // Server state matches the UI
     const moved = await (await request.get(`/api/notes/${c.id}`)).json();
