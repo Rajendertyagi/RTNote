@@ -252,6 +252,10 @@
 
 .hidden { display: none !important; }
 
+/* Author display values (e.g. .btn-icon { display:grid }) defeat the UA's
+   [hidden] style — the stop button must actually disappear. */
+[hidden] { display: none !important; }
+
 /* ── Connections page ── */
 .conn-app { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
 .conn-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

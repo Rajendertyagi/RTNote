@@ -130,6 +130,10 @@ test.describe("CDN failure fallback", () => {
     await page.getByTestId("composer").fill("offline markdown **test**");
     await page.getByTestId("send-btn").click();
 
+    // generation must reach its terminal state before we inspect the bubble
+    await expect(page.getByTestId("stop-btn")).toBeHidden();
+    await expect(page.getByTestId("send-btn")).toBeEnabled();
+
     const bubble = page.getByTestId("chat-stream").locator(".msg.assistant .bubble").last();
     await expect(bubble).toContainText("Hello from the");
     // no markdown rendering happened — raw asterisks visible as plain text

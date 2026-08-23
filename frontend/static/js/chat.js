@@ -51,9 +51,9 @@ async function loadSessions() {
     const item = document.createElement("div");
     item.className = "session-item" + (s.id === state.sessionId ? " active" : "");
     item.setAttribute("data-testid", "session-item");
+    item.onclick = () => openSession(s.id); // whole row is clickable
     const title = document.createElement("span");
     title.textContent = s.title || `Chat ${s.id}`;
-    title.onclick = () => openSession(s.id);
     const del = document.createElement("button");
     del.className = "del";
     del.setAttribute("aria-label", `Delete session ${s.title || s.id}`);
