@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RTNote — UI Design Pass Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   RTNote UI design-pass mockup — Catppuccin Mocha palette,
+   demonstrating: type scale · elevation · real status bar ·
+   dead-element removal · spacing rhythm · hover/focus states.
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --bg-base: #1e1e2e; --bg-mantle: #181825; --bg-crust: #11111b;
+  --bg-surface0: #313244; --bg-surface1: #45475a;
+  --text-1: #cdd6f4; --text-2: #a6adc8; --text-3: #7f849c;
+  --accent: #89b4fa; --accent-soft: rgba(137,180,250,.14);
+  --green: #a6e3a1; --yellow: #f9e2af; --red: #f38ba8; --overlay: #6c7086;
+  --border: #313244;
+  /* TYPE SCALE — the single biggest fix */
+  --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13.5px; --fs-lg: 15px;
+  --fs-xl: 20px; --fs-xxl: 26px;
+  --shadow-1: 0 1px 3px rgba(0,0,0,.35);
+  --shadow-2: 0 4px 16px rgba(0,0,0,.45);
+  --r-sm: 6px; --r-md: 10px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; }
+body {
+  font-family:'Inter','Segoe UI',system-ui,sans-serif;
+  font-size:var(--fs-md); color:var(--text-1); background:var(--bg-crust);
+}
+.app { display:flex; height:100vh; }
+
+/* ── Launcher rail ── */
+.launcher { width:52px; background:var(--bg-crust); display:flex; flex-direction:column;
+  align-items:center; padding:10px 0; gap:4px; }
+.launcher .ic { width:36px; height:36px; border-radius:var(--r-md); display:flex;
+  align-items:center; justify-content:center; color:var(--text-3); cursor:pointer;
+  transition:background .12s,color .12s; font-size:19px; }
+.launcher .ic:hover { background:var(--bg-surface0); color:var(--text-1); }
+.launcher .ic.active { background:var(--accent-soft); color:var(--accent); }
+.launcher .spacer { flex:1; }
+
+/* ── Left pane ── */
+.left-pane { width:250px; background:var(--bg-mantle); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; }
+.pane-head { padding:14px 14px 8px; }
+.pane-head h2 { font-size:var(--fs-xs); font-weight:600; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--text-3); }
+.search { margin:0 10px 8px; display:flex; align-items:center; gap:7px;
+  background:var(--bg-base); border:1px solid transparent; border-radius:var(--r-sm);
+  padding:6px 9px; transition:border-color .12s; }
+.search:focus-within { border-color:var(--accent); }
+.search i { color:var(--text-3); font-size:14px; }
+.search input { background:none; border:none; outline:none; color:var(--text-1);
+  font:inherit; font-size:var(--fs-sm); width:100%; }
+.search input::placeholder { color:var(--text-3); }
+
+.tree { flex:1; overflow:auto; padding:4px 6px; }
+.trow { display:flex; align-items:center; gap:7px; padding:5px 8px; border-radius:var(--r-sm);
+  cursor:pointer; color:var(--text-2); font-size:var(--fs-sm); user-select:none; }
+.trow:hover { background:var(--bg-surface0); color:var(--text-1); }
+.trow.active { background:var(--accent-soft); color:var(--accent); font-weight:500; }
+.trow i.type { font-size:14px; width:16px; text-align:center; opacity:.85; }
+.trow .expander { width:12px; color:var(--text-3); font-size:10px; text-align:center; }
+.trow.folder { color:var(--text-1); font-weight:500; }
+.trow .count { margin-left:auto; font-size:var(--fs-xs); color:var(--text-3); }
+
+/* ── Main pane ── */
+.main-pane { flex:1; display:flex; flex-direction:column; min-width:0; background:var(--bg-base); }
+.topbar { display:flex; align-items:center; gap:10px; padding:10px 16px;
+  border-bottom:1px solid var(--border); background:var(--bg-base); }
+.crumbs { display:flex; align-items:center; gap:6px; font-size:var(--fs-xs);
+  color:var(--text-3); min-width:0; }
+.crumbs span { cursor:pointer; } .crumbs span:hover { color:var(--text-1); }
+.crumbs .sep { opacity:.5; }
+.crumbs .here { color:var(--text-2); cursor:default; }
+.topbar .grow { flex:1; }
+.iconbtn { width:32px; height:32px; border:none; background:transparent; color:var(--text-2);
+  border-radius:var(--r-sm); cursor:pointer; display:flex; align-items:center;
+  justify-content:center; font-size:17px; transition:background .12s,color .12s; }
+.iconbtn:hover { background:var(--bg-surface0); color:var(--text-1); }
+.iconbtn.primary { background:var(--accent); color:var(--bg-crust); }
+.iconbtn.primary:hover { filter:brightness(1.1); }
+
+.titleblock { padding:22px 40px 0; max-width:860px; }
+.note-title { font-size:var(--fs-xxl); font-weight:700; letter-spacing:-.02em;
+  line-height:1.25; color:var(--text-1); }
+.meta-row { display:flex; align-items:center; gap:10px; margin-top:8px;
+  font-size:var(--fs-xs); color:var(--text-3); }
+.chip { display:inline-flex; align-items:center; gap:4px; padding:2px 8px;
+  border-radius:99px; background:var(--bg-surface0); color:var(--text-2); font-weight:500; }
+.chip.green { background:rgba(166,227,161,.12); color:var(--green); }
+.chip.blue { background:var(--accent-soft); color:var(--accent); }
+
+.editor-surface { flex:1; overflow:auto; padding:18px 40px 40px; max-width:860px; }
+.editor-surface p { line-height:1.75; color:var(--text-2); margin-bottom:14px; }
+.editor-surface h3 { font-size:var(--fs-lg); font-weight:600; margin:22px 0 10px; color:var(--text-1); }
+.editor-surface ul { margin:0 0 14px 20px; line-height:1.8; color:var(--text-2); }
+.editor-surface code { font-family:'JetBrains Mono',monospace; font-size:.85em;
+  background:var(--bg-mantle); border:1px solid var(--border); border-radius:4px; padding:1px 5px; }
+.caret-demo::after { content:''; display:inline-block; width:2px; height:15px;
+  background:var(--accent); vertical-align:-2px; animation:blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity:0; } }
+
+/* ── Right sidebar ── */
+.right-pane { width:290px; background:var(--bg-mantle); border-left:1px solid var(--border);
+  display:flex; flex-direction:column; }
+.rtabs { display:flex; padding:8px 8px 0; gap:2px; }
+.rtab { flex:1; text-align:center; padding:7px 0; font-size:var(--fs-sm); font-weight:500;
+  color:var(--text-3); border-radius:var(--r-sm) var(--r-sm) 0 0; cursor:pointer; }
+.rtab.active { color:var(--accent); background:var(--bg-base);
+  box-shadow:inset 0 -2px 0 var(--accent); }
+.chat-scroll { flex:1; overflow:auto; padding:14px; display:flex; flex-direction:column; gap:12px; }
+.msg { display:flex; gap:9px; }
+.msg .avatar { width:28px; height:28px; border-radius:var(--r-md); flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:14px; }
+.msg.user .avatar { background:var(--bg-surface1); color:var(--text-2); }
+.msg.assistant .avatar { background:var(--accent-soft); color:var(--accent); }
+.bubble { background:var(--bg-base); border:1px solid var(--border);
+  border-radius:var(--r-md); padding:9px 12px; font-size:var(--fs-sm);
+  line-height:1.55; color:var(--text-2); box-shadow:var(--shadow-1); }
+.msg.user .bubble { background:var(--bg-surface0); }
+.bubble b { color:var(--text-1); }
+.composer { padding:12px; border-top:1px solid var(--border); }
+.composer-box { display:flex; gap:8px; background:var(--bg-base);
+  border:1px solid var(--border); border-radius:var(--r-md); padding:8px 10px;
+  transition:border-color .12s; }
+.composer-box:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.composer-box input { flex:1; background:none; border:none; outline:none;
+  color:var(--text-1); font:inherit; font-size:var(--fs-sm); }
+.sendbtn { border:none; background:var(--accent); color:var(--bg-crust); width:30px;
+  height:30px; border-radius:var(--r-sm); cursor:pointer; font-size:15px;
+  display:flex; align-items:center; justify-content:center; }
+
+/* ── Status bar: REAL information ── */
+.status-bar { display:flex; align-items:center; gap:14px; padding:5px 16px;
+  background:var(--bg-mantle); border-top:1px solid var(--border);
+  font-size:var(--fs-xs); color:var(--text-3); }
+.status-bar .dot { width:7px; height:7px; border-radius:50%; background:var(--green);
+  box-shadow:0 0 6px rgba(166,227,161,.6); }
+.status-bar .right { margin-left:auto; display:flex; gap:14px; }
+.status-bar .mono { font-family:'JetBrains Mono',monospace; font-size:10.5px; }
+
+/* ── Annotation callouts ── */
+.callout { position:absolute; z-index:50; display:flex; gap:7px; align-items:flex-start;
+  max-width:230px; pointer-events:none; }
+.callout .num { width:20px; height:20px; border-radius:50%; background:#fab387;
+  color:var(--bg-crust); font-size:11px; font-weight:700; display:flex;
+  align-items:center; justify-content:center; flex-shrink:0; box-shadow:var(--shadow-2); }
+.callout .txt { font-size:11px; line-height:1.45; color:#fab387; font-weight:600;
+  text-shadow:0 1px 3px rgba(0,0,0,.8); }
+.shell-wrap { position:relative; height:100vh; }
+</style>
+<link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+</head>
+<body>
+<div class="shell-wrap">
+<div class="app">
+
+  <div class="launcher">
+    <div class="ic active"><i class='bx bx-note'></i></div>
+    <div class="ic"><i class='bx bx-search'></i></div>
+    <div class="ic"><i class='bx bx-calendar'></i></div>
+    <div class="spacer"></div>
+    <div class="ic"><i class='bx bx-cog'></i></div>
+  </div>
+
+  <div class="left-pane">
+    <div class="pane-head"><h2>Notes</h2></div>
+    <div class="search"><i class='bx bx-search'></i><input placeholder="Search notes…  Ctrl+K"></div>
+    <div class="tree">
+      <div class="trow folder"><span class="expander">▾</span><i class='bx bx-folder type'></i>Projects<span class="count">3</span></div>
+      <div class="trow" style="padding-left:27px"><span class="expander"></span><i class='bx bx-file type'></i>RTNote roadmap</div>
+      <div class="trow active" style="padding-left:27px"><span class="expander"></span><i class='bx bx-file type'></i>Kitchen remodel</div>
+      <div class="trow" style="padding-left:27px"><span class="expander"></span><i class='bx bx-code type'></i>deploy.sh</div>
+      <div class="trow folder"><span class="expander">▸</span><i class='bx bx-folder type'></i>Journal<span class="count">128</span></div>
+      <div class="trow folder"><span class="expander">▸</span><i class='bx bx-folder type'></i>Recipes</div>
+      <div class="trow"><span class="expander"></span><i class='bx bx-calendar-star type'></i>2026-08-23</div>
+      <div class="trow"><span class="expander"></span><i class='bx bx-book type'></i>Reading list</div>
+    </div>
+  </div>
+
+  <div class="main-pane">
+    <div class="topbar">
+      <div class="crumbs">
+        <span>Projects</span><span class="sep">›</span><span class="here">Kitchen remodel</span>
+      </div>
+      <div class="grow"></div>
+      <button class="iconbtn"><i class='bx bx-star'></i></button>
+      <button class="iconbtn"><i class='bx bx-paperclip'></i></button>
+      <button class="iconbtn"><i class='bx bx-table'></i></button>
+      <button class="iconbtn primary"><i class='bx bx-plus'></i></button>
+    </div>
+
+    <div class="titleblock">
+      <div class="note-title">Kitchen remodel</div>
+      <div class="meta-row">
+        <span class="chip blue"><i class='bx bx-file'></i> Text</span>
+        <span class="chip green"><i class='bx bx-check'></i> Saved</span>
+        <span>edited 2 min ago</span>
+        <span>·</span><span>3 sub-notes</span>
+      </div>
+    </div>
+
+    <div class="editor-surface">
+      <p>Budget locked at <code>€18,400</code>. Contractor confirmed start for the second week of September.</p>
+      <h3>Decisions made</h3>
+      <ul>
+        <li>Quartz counters — <b>Caeserstone "Frosty Carrina"</b></li>
+        <li>Keep existing appliances, replace hob only</li>
+        <li>Island dropped — kitchen is too narrow</li>
+      </ul>
+      <h3>Open questions</h3>
+      <p class="caret-demo">Ask electrician about the island sockets alternative on Tuesday </p>
+    </div>
+
+    <div class="status-bar">
+      <span class="dot"></span><span>All changes saved</span>
+      <span>·</span><span>142 words</span>
+      <div class="right">
+        <span class="mono">Catppuccin Mocha</span>
+        <span class="mono">v0.9</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-pane">
+    <div class="rtabs">
+      <div class="rtab active">Chat</div>
+      <div class="rtab">Outline</div>
+      <div class="rtab">Files</div>
+    </div>
+    <div class="chat-scroll">
+      <div class="msg assistant">
+        <div class="avatar"><i class='bx bx-bot'></i></div>
+        <div class="bubble">Your <b>Kitchen remodel</b> note has 3 open questions. Want me to list them?</div>
+      </div>
+      <div class="msg user">
+        <div class="avatar"><i class='bx bx-user'></i></div>
+        <div class="bubble">yes</div>
+      </div>
+      <div class="msg assistant">
+        <div class="avatar"><i class='bx bx-bot'></i></div>
+        <div class="bubble"><b>1.</b> Island sockets alternative<br><b>2.</b> Tile delivery date<br><b>3.</b> Paint finish for ceiling</div>
+      </div>
+    </div>
+    <div class="composer">
+      <div class="composer-box">
+        <input placeholder="Ask about your notes…">
+        <button class="sendbtn"><i class='bx bx-send'></i></button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ Design-pass annotations ═══ -->
+<div class="callout" style="top:14px; left:270px;">
+  <div class="num">1</div><div class="txt">TYPE SCALE<br>Title 26px bold — real hierarchy, not 14px</div>
+</div>
+<div class="callout" style="top:64px; left:270px;">
+  <div class="num">2</div><div class="txt">LIVING BREADCRUMB<br>Real path, clickable — no fake "Home › Work"</div>
+</div>
+<div class="callout" style="top:150px; left:270px;">
+  <div class="num">3</div><div class="txt">METADATA CHIPS<br>Type / save-state / age at a glance</div>
+</div>
+<div class="callout" style="bottom:44px; left:270px;">
+  <div class="num">4</div><div class="txt">REAL STATUS BAR<br>Save dot + word count — no fake "UTF-8" text</div>
+</div>
+<div class="callout" style="top:120px; left:60px;">
+  <div class="num">5</div><div class="txt">CALM TREE<br>Type icons, counts, hover states, no junk rows</div>
+</div>
+<div class="callout" style="top:300px; right:300px;">
+  <div class="num">6</div><div class="txt">ELEVATION<br>Bubbles get soft shadows; focus rings on inputs</div>
+</div>
+<div class="callout" style="bottom:120px; right:305px;">
+  <div class="num">7</div><div class="txt">PRIMARY ACTION<br>The + button is accented — one clear CTA</div>
+</div>
+</div>
+</body>
+</html>

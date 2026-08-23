@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RTNote — Features</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+<style>
+:root{
+  --bg:#0b0b14; --bg2:#101018; --panel:#14141f; --line:#23233a;
+  --t1:#e8e9f0; --t2:#a8abc4; --t3:#6b6f8a;
+  --acc:#89b4fa; --acc2:#cba6f7; --green:#a6e3a1; --yellow:#f9e2af; --red:#f38ba8; --peach:#fab387;
+  --r:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t1);font-family:'Inter','Segoe UI',system-ui,sans-serif;font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+::selection{background:rgba(137,180,250,.3)}
+.bg-grid{position:fixed;inset:0;z-index:-1;
+  background-image:radial-gradient(circle at 25% 10%,rgba(137,180,250,.07),transparent 45%),
+                   radial-gradient(circle at 80% 30%,rgba(203,166,247,.06),transparent 40%)}
+.bg-grid::after{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:56px 56px;opacity:.14;mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,#000 20%,transparent 75%)}
+.wrap{max-width:1120px;margin:0 auto;padding:0 28px}
+nav{position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);
+  background:rgba(11,11,20,.78);border-bottom:1px solid var(--line)}
+.nav-in{display:flex;align-items:center;gap:26px;height:60px}
+.logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:17px;letter-spacing:-.01em}
+.logo .mark{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--acc),var(--acc2));color:#0b0b14;font-size:15px}
+.logo b{color:var(--acc)}
+.nav-links{display:flex;gap:22px;margin-left:auto}
+.nav-links a{color:var(--t2);text-decoration:none;font-size:13.5px;font-weight:500;transition:color .15s}
+.nav-links a:hover{color:var(--t1)}
+.nav-cta{background:var(--acc);color:#0b0b14!important;padding:7px 16px;border-radius:9px;font-weight:600}
+.hero{text-align:center;padding:110px 0 90px;position:relative}
+.hero .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--acc);
+  border:1px solid rgba(137,180,250,.35);background:rgba(137,180,250,.08);
+  padding:5px 14px;border-radius:99px;margin-bottom:26px}
+.hero h1{font-size:clamp(38px,6vw,64px);font-weight:800;letter-spacing:-.035em;line-height:1.08;max-width:820px;margin:0 auto}
+.hero h1 .grad{background:linear-gradient(92deg,var(--acc) 0%,var(--acc2) 55%,var(--peach) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.sub{max-width:640px;margin:24px auto 0;color:var(--t2);font-size:18px;line-height:1.65}
+.hero .ctas{margin-top:36px;display:flex;gap:14px;justify-content:center}
+.btn{padding:12px 26px;border-radius:11px;text-decoration:none;font-weight:600;font-size:15px;transition:.15s;display:inline-block}
+.btn.primary{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#0b0b14;box-shadow:0 8px 30px rgba(137,180,250,.25)}
+.btn.primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(137,180,250,.4)}
+.btn.ghost{border:1px solid var(--line);color:var(--t1)}
+.btn.ghost:hover{border-color:var(--t3);background:var(--panel)}
+section.pillar{padding:84px 0;border-top:1px solid var(--line)}
+.pillar-head{max-width:640px;margin-bottom:52px}
+.pillar-head .tag{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:.12em;text-transform:uppercase}
+.pillar-head h2{font-size:34px;font-weight:750;letter-spacing:-.02em;margin:10px 0 14px}
+.pillar-head p{color:var(--t2);font-size:16.5px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;margin-bottom:72px}
+.row:last-child{margin-bottom:0}
+.row.flip .copy{order:2}
+.copy h3{font-size:21px;font-weight:650;margin-bottom:10px;letter-spacing:-.01em}
+.copy p{color:var(--t2);font-size:15px;margin-bottom:18px}
+.copy ul{list-style:none}
+.copy li{display:flex;gap:10px;color:var(--t2);font-size:14.5px;padding:5px 0}
+.copy li i{color:var(--green);font-size:16px;margin-top:2px}
+.copy li b{color:var(--t1);font-weight:550}
+.win{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);transition:transform .25s,box-shadow .25s}
+.win:hover{transform:translateY(-4px);box-shadow:0 28px 70px rgba(0,0,0,.6),0 0 0 1px rgba(137,180,250,.18)}
+.win-bar{display:flex;align-items:center;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg2)}
+.dot{width:10px;height:10px;border-radius:50%}
+.dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
+.win-title{margin-left:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t3)}
+.win-body{padding:18px;font-size:13px}
+.ed-toolbar{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.ed-btn{width:24px;height:24px;border-radius:5px;background:var(--bg2);color:var(--t3);
+  display:flex;align-items:center;justify-content:center;font-size:13px}
+.ed-page{padding:20px 22px}
+.ed-page h4{font-size:19px;font-weight:700;letter-spacing:-.01em;margin-bottom:6px}
+.ed-meta{display:flex;gap:8px;margin-bottom:14px}
+.chip{font-size:10.5px;font-weight:600;padding:2px 9px;border-radius:99px}
+.chip.b{background:rgba(137,180,250,.13);color:var(--acc)}
+.chip.g{background:rgba(166,227,161,.12);color:var(--green)}
+.ed-page p{color:var(--t2);line-height:1.7;font-size:13px}
+.ed-page code{font-family:'JetBrains Mono',monospace;font-size:11.5px;background:var(--bg2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--peach)}
+.tree-demo{display:flex}
+.tree-col{width:44%;border-right:1px solid var(--line);padding:12px}
+.trow{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:7px;color:var(--t2);font-size:12.5px}
+.trow i{font-size:13px;color:var(--t3)}
+.trow.on{background:rgba(137,180,250,.12);color:var(--acc)}
+.trow.sub{padding-left:26px}
+.tabbar{flex:1;padding:8px 10px;display:flex;gap:6px;border-bottom:1px solid var(--line)}
+.tab{font-size:11px;padding:4px 12px;border-radius:7px;color:var(--t3);background:var(--bg2)}
+.tab.on{color:var(--t1);background:var(--panel);border:1px solid var(--line)}
+.diagram{display:flex;flex-direction:column;gap:14px;padding:26px 20px;align-items:center}
+.flow{display:flex;align-items:center;gap:10px}
+.node{padding:9px 16px;border-radius:9px;font-size:12px;font-weight:600;border:1px solid}
+.n-blue{background:rgba(137,180,250,.1);border-color:rgba(137,180,250,.4);color:var(--acc)}
+.n-purple{background:rgba(203,166,247,.1);border-color:rgba(203,166,247,.4);color:var(--acc2)}
+.n-green{background:rgba(166,227,161,.09);border-color:rgba(166,227,161,.35);color:var(--green)}
+.arrow{color:var(--t3);font-size:16px}
+.mindmap{display:flex;align-items:center;gap:8px;margin-top:6px}
+.mm-core{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));
+  display:flex;align-items:center;justify-content:center;color:#0b0b14;font-weight:700;font-size:11px}
+.mm-line{width:26px;height:2px;background:var(--line)}
+.mm-kid{padding:5px 12px;border-radius:99px;font-size:11px;border:1px dashed var(--t3);color:var(--t2)}
+.chatwin{display:flex;flex-direction:column;gap:12px;padding:18px}
+.cmsg{display:flex;gap:9px;max-width:88%}
+.cmsg .av{width:26px;height:26px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px}
+.cmsg.a .av{background:rgba(137,180,250,.14);color:var(--acc)}
+.cmsg.u .av{background:var(--bg-surface1,#333);color:var(--t2)}
+.cmsg.u{margin-left:auto;flex-direction:row-reverse}
+.bub{background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:8px 12px;font-size:12.5px;color:var(--t2);line-height:1.5}
+.cmsg.u .bub{background:rgba(137,180,250,.1);border-color:rgba(137,180,250,.25);color:var(--t1)}
+.typing{display:inline-flex;gap:3px;padding:4px 2px}
+.typing span{width:5px;height:5px;border-radius:50%;background:var(--t3);animation:tp 1.2s infinite}
+.typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+@keyframes tp{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-3px)}}
+.safety{display:flex;flex-direction:column;gap:10px;padding:18px}
+.evt{display:flex;gap:12px;align-items:flex-start}
+.evt .ic{width:30px;height:30px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px}
+.evt.backup .ic{background:rgba(166,227,161,.1);color:var(--green)}
+.evt.trash .ic{background:rgba(249,226,175,.1);color:var(--yellow)}
+.evt.search .ic{background:rgba(137,180,250,.1);color:var(--acc)}
+.evt .et b{display:block;font-size:12.5px;font-weight:600}
+.evt .es{font-size:11.5px;color:var(--t3);font-family:'JetBrains Mono',monospace}
+.searchbar{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--line);
+  border-radius:9px;padding:8px 12px;margin-bottom:4px}
+.searchbar i{color:var(--t3)}
+.searchbar kbd{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t3);
+  border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+.searchbar .q{font-size:12.5px;color:var(--t2)}
+.searchbar .q mark{background:rgba(249,226,175,.25);color:var(--yellow);border-radius:3px;padding:0 2px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin:90px 0 0}
+.stat{background:var(--panel);padding:30px 20px;text-align:center}
+.stat .n{font-size:32px;font-weight:800;letter-spacing:-.03em;
+  background:linear-gradient(135deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat .l{font-size:12.5px;color:var(--t3);margin-top:4px}
+.final{text-align:center;padding:110px 0 130px}
+.final h2{font-size:clamp(30px,4.5vw,46px);font-weight:800;letter-spacing:-.03em;margin-bottom:16px}
+.final p{color:var(--t2);margin-bottom:34px}
+footer{border-top:1px solid var(--line);padding:28px 0;color:var(--t3);font-size:13px}
+footer .wrap{display:flex;justify-content:space-between}
+@media(max-width:900px){.row{grid-template-columns:1fr}.row.flip .copy{order:0}.stats{grid-template-columns:1fr 1fr}.nav-links a:not(.nav-cta){display:none}}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+
+<nav><div class="wrap nav-in">
+  <div class="logo"><span class="mark"><i class='bx bx-note'></i></span>RT<b>Note</b></div>
+  <div class="nav-links">
+    <a href="#write">Write</a><a href="#organize">Organize</a><a href="#visual">Visualize</a>
+    <a href="#ai">AI</a><a href="#safety">Safety</a>
+    <a class="nav-cta" href="#start">Get started</a>
+  </div>
+</div></nav>
+
+<header class="hero wrap">
+  <div class="eyebrow"><i class='bx bx-bolt-circle'></i> FastAPI · SQLite · Your machine</div>
+  <h1>Your second brain.<br><span class="grad">Local, fast, and yours forever.</span></h1>
+  <p class="sub">RTNote is a personal knowledge base inspired by Trilium — rich notes, code,
+     diagrams, mind maps and an AI assistant, backed by one SQLite file you own.</p>
+  <div class="ctas">
+    <a class="btn primary" href="#write">Explore features</a>
+    <a class="btn ghost" href="#safety">How your data stays safe</a>
+  </div>
+</header>
+<!-- ═══ WRITE ═══ -->
+<section class="pillar" id="write"><div class="wrap">
+  <div class="pillar-head">
+    <div class="tag">01 — Write</div>
+    <h2>Every kind of note, one place</h2>
+    <p>Rich text for thinking, raw HTML for pages, real code editing with syntax highlighting.</p>
+  </div>
+  <div class="row">
+    <div class="copy">
+      <h3>Rich text that gets out of the way</h3>
+      <p>A tuned WYSIWYG editor with image paste-upload, tables and clean HTML underneath.</p>
+      <ul>
+        <li><i class='bx bx-check'></i><span><b>SunEditor</b> — headings, tables, links, colors</span></li>
+        <li><i class='bx bx-check'></i><span>Images upload on paste and embed as local attachments</span></li>
+        <li><i class='bx bx-check'></i><span>Autosave while you type — no save-button anxiety</span></li>
+      </ul>
+    </div>
+    <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="win-title">kitchen-remodel — text note</span></div>
+      <div class="ed-toolbar"><span class="ed-btn"><i class='bx bx-bold'></i></span><span class="ed-btn"><i class='bx bx-italic'></i></span><span class="ed-btn"><i class='bx bx-list-ul'></i></span><span class="ed-btn"><i class='bx bx-link'></i></span><span class="ed-btn"><i class='bx bx-image'></i></span></div>
+      <div class="ed-page">
+        <h4>Kitchen remodel</h4>
+        <div class="ed-meta"><span class="chip b">Text</span><span class="chip g">Saved just now</span></div>
+        <p>Budget locked at <code>&euro;18,400</code>. Contractor confirmed for September.
+           Quartz counters decided — see the <code>suppliers</code> child note.</p>
+      </div>
+    </div>
+  </div>
+  <div class="row flip">
+    <div class="copy">
+      <h3>Code notes with a real editor</h3>
+      <p>Eighteen languages with CodeMirror 6 — Python to Rust — plus live preview for HTML.</p>
+      <ul>
+        <li><i class='bx bx-check'></i><span><b>Syntax highlighting</b> loaded per-language, lazily</span></li>
+        <li><i class='bx bx-check'></i><span>Line numbers, search, bracket matching, word-wrap toggle</span></li>
+        <li><i class='bx bx-check'></i><span>HTML code notes render in a sandboxed live preview</span></li>
+      </ul>
+    </div>
+    <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="win-title">deploy.sh — Shell</span></div>
+      <div class="win-body" style="font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.8">
+        <div><span style="color:var(--acc2)">#!/usr/bin/env</span> bash</div>
+        <div><span style="color:var(--t3)"># nightly backup of the notes DB</span></div>
+        <div><span style="color:var(--peach)">sqlite3</span> data/notes.db ".backup" \</div>
+        <div>&nbsp;&nbsp;<span style="color:var(--yellow)">"backups/notes-$(date +%F).db"</span></div>
+        <div><span style="color:var(--acc)">echo</span> <span style="color:var(--green)">"done &#10003;"</span></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ═══ ORGANIZE ═══ -->
+<section class="pillar" id="organize"><div class="wrap">
+  <div class="pillar-head">
+    <div class="tag">02 — Organize</div>
+    <h2>Structure that scales past 10,000 notes</h2>
+    <p>An infinite tree, real tabs, daily journal pages, bookmarks and a forgiving trash.</p>
+  </div>
+  <div class="row">
+    <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="win-title">workspace</span></div>
+      <div class="tree-demo">
+        <div class="tree-col">
+          <div class="trow"><i class='bx bx-folder'></i>Projects</div>
+          <div class="trow sub on"><i class='bx bx-file'></i>Kitchen remodel</div>
+          <div class="trow sub"><i class='bx bx-code'></i>deploy.sh</div>
+          <div class="trow"><i class='bx bx-calendar-star'></i>2026-08-23</div>
+          <div class="trow"><i class='bx bx-book-content'></i>Reading list</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column">
+          <div class="tabbar"><span class="tab on">Kitchen remodel</span><span class="tab">deploy.sh</span><span class="tab">+</span></div>
+          <div style="padding:16px;color:var(--t3);font-size:12px">Tabs persist across restarts —<br>exactly where you left them.</div>
+        </div>
+      </div>
+    </div>
+    <div class="copy">
+      <h3>Everything in its place</h3>
+      <p>Hierarchy is the primary navigation — parents, children, deep subtrees — all instant.</p>
+      <ul>
+        <li><i class='bx bx-check'></i><span><b>Persistent tabs</b> — reopen the app, land where you left off</span></li>
+        <li><i class='bx bx-check'></i><span><b>Journal</b> — one click creates today's dated note, filed automatically</span></li>
+        <li><i class='bx bx-check'></i><span><b>Bookmarks strip</b> for the notes you live in</span></li>
+        <li><i class='bx bx-check'></i><span>Delete is soft — everything rests in Trash until you say otherwise</span></li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<!-- ═══ VISUALIZE ═══ -->
+<section class="pillar" id="visual"><div class="wrap">
+  <div class="pillar-head">
+    <div class="tag">03 — Visualize</div>
+    <h2>Think in diagrams, not just paragraphs</h2>
+    <p>Mermaid flowcharts, mind maps and a calendar view of anything with a date.</p>
+  </div>
+  <div class="row">
+    <div class="copy">
+      <h3>Diagrams as notes</h3>
+      <p>Type Mermaid syntax, get a live-rendered SVG beside it. Mind maps are editable canvases.</p>
+      <ul>
+        <li><i class='bx bx-check'></i><span><b>Mermaid</b> — flowcharts, sequences, gantt, live preview</span></li>
+        <li><i class='bx bx-check'></i><span><b>Mind maps</b> — MindElixir canvas, autosaved as JSON</span></li>
+        <li><i class='bx bx-check'></i><span><b>Calendar</b> — date-tagged notes appear on a month view</span></li>
+      </ul>
+    </div>
+    <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="win-title">release-flow — mermaid</span></div>
+      <div class="diagram">
+        <div class="flow">
+          <span class="node n-blue">Commit</span><span class="arrow">&#8594;</span>
+          <span class="node n-purple">CI passes?</span><span class="arrow">&#8594;</span>
+          <span class="node n-green">Deploy</span>
+        </div>
+        <div class="mindmap">
+          <div class="mm-core">v2.0</div><div class="mm-line"></div>
+          <span class="mm-kid">changelog</span><span class="mm-line"></span>
+          <span class="mm-kid">migration guide</span><span class="mm-line"></span>
+          <span class="mm-kid">blog post</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ═══ AI ═══ -->
+<section class="pillar" id="ai"><div class="wrap">
+  <div class="pillar-head">
+    <div class="tag">04 — AI</div>
+    <h2>An assistant that lives next to your notes</h2>
+    <p>Chat in a side panel or a full page. Pick any provider — OpenAI, Claude, DeepSeek, Gemini, Ollama — through LiteLLM.</p>
+  </div>
+  <div class="row">
+    <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="win-title">assistant — claude-sonnet</span></div>
+      <div class="chatwin">
+        <div class="cmsg u"><div class="av"><i class='bx bx-user'></i></div><div class="bub">summarize my kitchen decisions</div></div>
+        <div class="cmsg a"><div class="av"><i class='bx bx-bot'></i></div><div class="bub">Three decisions locked: quartz counters, keep appliances, island dropped. One open question about sockets.</div></div>
+        <div class="cmsg u"><div class="av"><i class='bx bx-user'></i></div><div class="bub">what was the budget again?</div></div>
+        <div class="cmsg a"><div class="av"><i class='bx bx-bot'></i></div><div class="bub">&euro;18,400 — noted in the first line &#10003;</div></div>
+        <div class="cmsg a"><div class="av"><i class='bx bx-bot'></i></div><div class="bub"><span class="typing"><span></span><span></span><span></span></span></div></div>
+      </div>
+    </div>
+    <div class="copy">
+      <h3>Bring your own intelligence</h3>
+      <p>No subscription lock-in. Configure providers once; switch models mid-conversation.</p>
+      <ul>
+        <li><i class='bx bx-check'></i><span><b>Any provider</b> via LiteLLM — including local Ollama</span></li>
+        <li><i class='bx bx-check'></i><span><b>Memories</b> — key facts persist across conversations</span></li>
+        <li><i class='bx bx-check'></i><span><b>Streaming replies</b>, attachable text files for context</span></li>
+        <li><i class='bx bx-check'></i><span>Keys stay on your machine, masked everywhere in the UI</span></li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<!-- ═══ SAFETY ═══ -->
+<section class="pillar" id="safety"><div class="wrap">
+  <div class="pillar-head">
+    <div class="tag">05 — Safety</div>
+    <h2>Boring, obsessive data safety</h2>
+    <p>It's your second brain. Losing it is not an option, so nothing here is trusted to luck.</p>
+  </div>
+  <div class="row">
+    <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="win-title">data/safety.log</span></div>
+      <div style="padding:14px 14px 0"><div class="searchbar"><i class='bx bx-search'></i><span class="q">island <mark>sockets</mark> electrician&#8230;</span><kbd>Ctrl K</kbd></div></div>
+      <div class="safety">
+        <div class="evt backup"><div class="ic"><i class='bx bx-data'></i></div><div class="et"><b>Automatic snapshot taken</b><span class="es">backup completed size=184KB &#8594; backups/notes-2026.db</span></div></div>
+        <div class="evt trash"><div class="ic"><i class='bx bx-trash'></i></div><div class="et"><b>Soft delete — restorable</b><span class="es">deleted_at=2026-08-23 delete_id=a4f81c&#8230; subtree=3 notes</span></div></div>
+        <div class="evt search"><div class="ic"><i class='bx bx-search-alt'></i></div><div class="et"><b>Full-text search, offline</b><span class="es">SQLite FTS5 &#183; snippet-centered results &#183; zero cloud</span></div></div>
+      </div>
+    </div>
+    <div class="copy">
+      <h3>Designed so mistakes are cheap</h3>
+      <p>One SQLite file, snapshotted automatically, deletions reversible, search fully offline.</p>
+      <ul>
+        <li><i class='bx bx-check'></i><span><b>Daily backups</b> via SQLite's online API — safe even mid-write</span></li>
+        <li><i class='bx bx-check'></i><span><b>Trash with restore</b> — whole subtrees come back intact</span></li>
+        <li><i class='bx bx-check'></i><span><b>FTS5 search</b> with match snippets and breadcrumb paths</span></li>
+        <li><i class='bx bx-check'></i><span><b>Request-correlated logs</b> — every action traceable after the fact</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">7</div><div class="l">note types</div></div>
+    <div class="stat"><div class="n">18</div><div class="l">code languages</div></div>
+    <div class="stat"><div class="n">10</div><div class="l">themes</div></div>
+    <div class="stat"><div class="n">1</div><div class="l">file that holds your life</div></div>
+  </div>
+</div></section>
+
+<div class="final wrap" id="start">
+  <h2>Own your thinking.</h2>
+  <p>No cloud. No subscription. No lock-in.<br>Just your notes, on your machine, forever.</p>
+  <a class="btn primary" href="#write">Back to top</a>
+</div>
+
+<footer><div class="wrap">
+  <span>RTNote — a personal knowledge base</span>
+  <span>Inspired by Trilium &#183; FastAPI + SQLite</span>
+</div></footer>
+</body>
+</html>

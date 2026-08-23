@@ -13,6 +13,13 @@ document.addEventListener('DOMContentLoaded', () => {
         initNoteMenu();
         initNavigation();
         initMoveDialog();
+        initSidebar();
+
+        /* Restore persisted sidebar collapse state */
+        if (localStorage.getItem('sidebarCollapsed') === '1') {
+            document.getElementById('rightSidebar')?.classList.add('hidden');
+        }
+        initMoveDialog();
 
         /* Launcher rail — every visible icon is a real destination */
         const searchBtn = document.getElementById('launcherSearch');

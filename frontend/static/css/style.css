@@ -69,12 +69,15 @@
     --text-muted: #b8b8b5;
     --left-pane-item-hover-background: #f1f1ef;
     --left-pane-item-selected-background: #e9e9e7;
-    --ff-sans: 'Segoe UI', Inter, system-ui, sans-serif;
-    --ff-mono: 'Cascadia Code', ui-monospace, monospace;
+    --ff-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    --ff-mono: 'JetBrains Mono', 'Cascadia Code', ui-monospace, monospace;
     --fs-xs: 11px;
     --fs-sm: 12px;
     --fs-base: 13px;
     --fs-md: 14px;
+    --fs-lg: 15px;
+    --fs-xl: 20px;
+    --fs-xxl: 26px;
     --w-launcher: 44px;
     --w-sidebar: 280px;
     --radius-sm: 4px;
@@ -255,13 +258,17 @@
   .app { display: flex; height: 100vh; width: 100vw; }
   .main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-main); }
   .topbar { background: var(--bg-main); border-bottom: 1px solid var(--border); padding: 8px 12px; display: flex; align-items: center; gap: 12px; }
-  .topbar__title { font-size: 14px; font-weight: 600; color: var(--text-1); }
+  .topbar__title { font-size: var(--fs-xl); font-weight: 650; letter-spacing: -0.01em;
+    color: var(--text-1); line-height: 1.25; }
   .topbar__breadcrumb { font-size: 11px; color: var(--text-3); margin-top: 2px; }
   .topbar__actions { display: flex; gap: 6px; align-items: center; margin-left: auto; }
   /* Navigation (GUI-2): back/forward live left of the note identity */
   .topbar__nav { display: flex; gap: 2px; align-items: center; }
   .topbar__nav .btn-icon[disabled] { opacity: .35; cursor: default; }
   .topbar__nav .btn-icon[disabled]:hover { background: transparent; }
+  /* The one primary action on the screen: creating a note. */
+  #newNoteBtn { background: var(--blue-500); color: #fff; border-radius: var(--radius-md); }
+  #newNoteBtn:hover { background: var(--blue-600); }
   /* Clickable breadcrumbs */
   .topbar__breadcrumb {
     font-size: 11px; color: var(--text-3); margin-top: 2px;
@@ -442,6 +449,15 @@
   background: var(--bg-main);
   color: var(--text-1);
 }
+/* Reading surface: comfortable measure + type for the actual content */
+.editor-wrap .se-wrapper-wysiwyg {
+  font-size: var(--fs-lg);
+  line-height: 1.75;
+  padding: 22px 34px;
+}
+.editor-wrap .se-wrapper-wysiwyg h1 { font-size: var(--fs-xxl); letter-spacing: -0.02em; }
+.editor-wrap .se-wrapper-wysiwyg h2 { font-size: var(--fs-xl); letter-spacing: -0.015em; }
+.editor-wrap .se-wrapper-wysiwyg h3 { font-size: var(--fs-lg); }
 .editor-wrap .se-toolbar {
   background: var(--bg-main);
   color: var(--text-1);
@@ -570,6 +586,7 @@
     flex-direction: column;
     background: var(--bg-sidebar);
     border-top: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
 }
 .trash-header {
     display: flex;
@@ -630,6 +647,7 @@
     color: var(--text-1);
     border: 1px solid var(--border);
     border-radius: 12px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
     padding: 14px;
     box-shadow: 0 18px 60px rgba(0,0,0,.4);
 }

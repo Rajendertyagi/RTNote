@@ -421,22 +421,61 @@ function initNoteMenu() {
     document.addEventListener('click', () => menu.classList.remove('open'));
 }
 
-/* ── Right sidebar ── */
+/* ── Right sidebar (GUI-5): one owner for tab switching + persistence ── */
+const SIDEBAR_TABS = ['info', 'outline', 'files', 'chat'];
+
 function switchRightTab(name) {
-    document.querySelectorAll('.right-sidebar .tab').forEach((t) => t.classList.remove('active'));
-    const activeTab = document.querySelector('.right-sidebar .tab[data-tab="' + name + '"]');
-    if (activeTab) activeTab.classList.add('active');
-    document.getElementById('chat-panel').classList.toggle('hidden', name !== 'chat');
-    document.getElementById('outline-panel').classList.toggle('hidden', name !== 'outline');
-    document.getElementById('memories-panel').classList.toggle('hidden', name !== 'memories');
-    document.getElementById('files-panel').classList.toggle('hidden', name !== 'files');
-    if (name === 'memories') loadMemories();
+    if (!SIDEBAR_TABS.includes(name)) name = 'chat';
+    document.querySelectorAll('.right-sidebar .tab').forEach((t) => {
+        const on = t.dataset.tab === name;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.getElementById('info-panel')?.classList.toggle('hidden', name !== 'info');
+    document.getElementById('outline-panel')?.classList.toggle('hidden', name !== 'outline');
+    document.getElementById('files-panel')?.classList.toggle('hidden', name !== 'files');
+    document.getElementById('chat-panel')?.classList.toggle('hidden', name !== 'chat');
+    localStorage.setItem('sidebarTab', name);
+    /* Contextual refresh on activation (lightweight; panels also follow the
+       active note via openNoteInEditor hooks). */
+    if (name === 'info' && typeof NoteInfo !== 'undefined') NoteInfo.refresh();
+    if (name === 'outline' && typeof Outline !== 'undefined') Outline.refresh();
     if (name === 'files') loadFiles();
+}
+
+function initSidebar() {
+    const tabsEl = document.querySelector('.right-sidebar .tabs');
+    if (tabsEl) {
+        tabsEl.addEventListener('click', (e) => {
+            const t = e.target.closest('.tab[data-tab]');
+            if (t) switchRightTab(t.dataset.tab);
+        });
+        tabsEl.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            const t = e.target.closest('.tab[data-tab]');
+            if (t) { e.preventDefault(); switchRightTab(t.dataset.tab); }
+        });
+    }
+    /* Restore last active panel */
+    const saved = localStorage.getItem('sidebarTab');
+    if (saved) switchRightTab(saved);
+
+    /* Memories strip lives inside the Chat panel now */
+    const memBtn = document.getElementById('memoriesToggleMini');
+    const memStrip = document.getElementById('memories-strip');
+    if (memBtn && memStrip) {
+        memBtn.addEventListener('click', () => {
+            memStrip.classList.toggle('hidden');
+            if (!memStrip.classList.contains('hidden')) loadMemories();
+        });
+    }
 }
 
 function toggleRightSidebar() {
     const sidebar = document.getElementById('rightSidebar');
-    if (sidebar) sidebar.classList.toggle('hidden');
+    if (!sidebar) return;
+    sidebar.classList.toggle('hidden');
+    localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('hidden') ? '1' : '');
 }
 
 /* ── Theme ── */
@@ -449,13 +488,13 @@ function initTheme() {
     // Sync status bar with the restored theme (not just on change)
     const statusEl = document.getElementById('status-right');
     if (statusEl && themeSelect.selectedIndex >= 0) {
-        statusEl.textContent = 'UTF-8 | ' + themeSelect.options[themeSelect.selectedIndex].text;
+        statusEl.textContent = 'Theme: ' + themeSelect.options[themeSelect.selectedIndex].text;
     }
     themeSelect.addEventListener('change', (e) => {
         document.documentElement.dataset.theme = e.target.value;
         localStorage.setItem('theme', e.target.value);
         const statusEl = document.getElementById('status-right');
-        if (statusEl) statusEl.textContent = 'UTF-8 | ' + e.target.options[e.target.selectedIndex].text;
+        if (statusEl) statusEl.textContent = 'Theme: ' + e.target.options[e.target.selectedIndex].text;
         showToast('Theme: ' + e.target.options[e.target.selectedIndex].text, 'info');
     });
 }

@@ -164,6 +164,9 @@ async function openNoteInEditor(noteId) {
         if (typeof navUpdateButtons === 'function') navUpdateButtons();
         if (typeof renderBreadcrumb === 'function') renderBreadcrumb(note.id);
         if (typeof revealNoteInTree === 'function') revealNoteInTree(note.id);
+        /* GUI-5 contextual sidebar follows the active note */
+        if (typeof NoteInfo !== 'undefined') NoteInfo.onNoteOpened(note);
+        if (typeof Outline !== 'undefined') Outline.onNoteOpened(note);
         updateBookmarkStar();
 
         if (App.currentNoteType === 'mermaid') {
@@ -192,6 +195,7 @@ async function openNoteInEditor(noteId) {
 function scheduleSave() {
     if (!App.currentNoteId) return;
     setSaveState('dirty');
+    if (typeof Outline !== 'undefined') Outline.onContentChanged(); // debounced inside
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(saveNoteNow, 800);
 }

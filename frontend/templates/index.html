@@ -36,7 +36,7 @@
          so basicSetup is composed from the scoped packages instead. -->
 
     <!-- App styles -->
-    <link rel="stylesheet" href="/static/css/style.css?v=22">
+    <link rel="stylesheet" href="/static/css/style.css?v=23">
     <link rel="stylesheet" href="/static/css/themes.css?v=19">
     <link rel="stylesheet" href="/static/css/chat.css?v=3">
 </head>
@@ -191,18 +191,30 @@
 
             <div class="status-bar">
                 <span id="status-left">Ready</span>
-                <span id="status-right">UTF-8 | Catppuccin Mocha</span>
+                <span id="status-right">Theme: Catppuccin Mocha</span>
             </div>
         </div>
 
         <div class="right-sidebar" id="rightSidebar">
-            <div class="tabs">
-                <div class="tab active" data-tab="chat" onclick="switchRightTab('chat')">Chat</div>
-                <div class="tab" data-tab="outline" onclick="switchRightTab('outline')">Outline</div>
-                <div class="tab" data-tab="memories" onclick="switchRightTab('memories')">Memories</div>
-                <div class="tab" data-tab="files" onclick="switchRightTab('files')">Files</div>
+            <div class="tabs" role="tablist" aria-label="Note sidebar">
+                <div class="tab" role="tab" data-tab="info" tabindex="0" aria-label="Info panel">Info</div>
+                <div class="tab" role="tab" data-tab="outline" tabindex="0" aria-label="Outline panel">Outline</div>
+                <div class="tab" role="tab" data-tab="files" tabindex="0" aria-label="Attachments panel">Attach</div>
+                <div class="tab active" role="tab" data-tab="chat" tabindex="0" aria-label="Chat panel">Chat</div>
             </div>
-            <div class="chat-container" id="chat-panel">
+            <div class="right-content hidden" id="info-panel" data-testid="panel-info" role="tabpanel">
+                <div id="info-list" class="info-list"><div class="empty-state-small">No note selected.</div></div>
+            </div>
+            <div class="right-content hidden" id="outline-panel" data-testid="panel-outline" role="tabpanel">
+                <div id="outline-list" class="outline-list"><div class="empty-state-small">No headings in this note.</div></div>
+            </div>
+            <div class="right-content hidden" id="files-panel" data-testid="panel-attachments" role="tabpanel">
+                <div class="files-actions">
+                    <button class="btn-sm" id="uploadFileBtn2"><i class='bx bx-upload'></i> Attach file</button>
+                </div>
+                <div id="files-list" class="files-list"></div>
+            </div>
+            <div class="chat-container" id="chat-panel" data-testid="panel-chat" role="tabpanel">
                 <div class="chat-mini-toolbar">
                     <select id="chatModelMini" title="Model" data-testid="mini-model-select"></select>
                     <select id="chatEffortMini" title="Thinking level">
@@ -211,11 +223,13 @@
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
                     </select>
+                    <button class="qs-action" id="memoriesToggleMini" title="Memories" aria-label="Toggle memories"><i class='bx bx-brain'></i></button>
                     <button class="qs-action" id="chatAttachMini" title="Attach text file" aria-label="Attach text file"><i class='bx bx-paperclip'></i></button>
                     <input type="file" id="chatFileMini" multiple hidden
                            accept=".txt,.md,.markdown,.csv,.json,.py,.js,.ts,.html,.css,.xml,.yml,.yaml,.log,.sql,.sh,.toml,.ini">
                     <a href="/chat" target="_blank" class="qs-action" title="Open full chat" aria-label="Open full chat"><i class='bx bx-expand-alt'></i></a>
                 </div>
+                <div id="memories-strip" class="hidden"><div id="memories-list" class="empty-state-small">Loading memories...</div></div>
                 <div id="chatAttChipsMini" class="chat-att-chips hidden"></div>
                 <div class="chat-messages" id="chat-messages" data-testid="mini-chat-stream">
                     <div class="msg assistant">
@@ -227,14 +241,6 @@
                     <input type="text" id="chat-input" data-testid="mini-composer" placeholder="Ask about your notes..." onkeypress="if(event.key==='Enter')sendMessage()">
                     <button onclick="sendMessage()" aria-label="Send" data-testid="mini-send-btn"><i class='bx bx-send'></i></button>
                 </div>
-            </div>
-            <div class="right-content hidden" id="outline-panel"><div class="empty-state-small">No outline yet — add headings</div></div>
-            <div class="right-content hidden" id="memories-panel"><div class="empty-state-small" id="memories-list">Loading memories...</div></div>
-            <div class="right-content hidden" id="files-panel">
-                <div class="files-actions">
-                    <button class="btn-sm" id="uploadFileBtn2"><i class='bx bx-upload'></i> Attach file</button>
-                </div>
-                <div id="files-list" class="files-list"></div>
             </div>
         </div>
     </div>
@@ -279,9 +285,11 @@
     <script src="/static/js/chat-core.js?v=3"></script>
     <script src="/static/js/history.js?v=2"></script>
     <script src="/static/js/api.js?v=22"></script>
-    <script src="/static/js/ui.js?v=22"></script>
+    <script src="/static/js/ui.js?v=23"></script>
     <script src="/static/js/tree.js?v=22"></script>
     <script src="/static/js/editor.js?v=22"></script>
+    <script src="/static/js/noteinfo.js?v=1"></script>
+    <script src="/static/js/outline.js?v=1"></script>
     <script src="/static/js/search.js?v=21"></script>
     <script src="/static/js/main.js?v=21"></script>
 </body>
