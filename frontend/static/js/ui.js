@@ -143,6 +143,82 @@ function initTabs() {
     });
 }
 
+/* ── Navigation (GUI-2): history stepping + clickable breadcrumbs ── */
+function navUpdateButtons() {
+    const b = document.getElementById('navBackBtn');
+    const f = document.getElementById('navFwdBtn');
+    if (b) b.disabled = !NavHistory.canBack();
+    if (f) f.disabled = !NavHistory.canForward();
+}
+
+async function navStep(dir) {
+    await App.bootReady; // never race the boot-time tab restore
+    // Skip dead entries (deleted/missing notes) until one opens or the
+    // stack ends in that direction.
+    while (dir < 0 ? NavHistory.canBack() : NavHistory.canForward()) {
+        const id = NavHistory.peek(dir);
+        if (id == null) return;
+        let alive = false;
+        try {
+            const n = await apiGetNote(id);
+            alive = !n.deleted_at;
+        } catch (err) { /* missing → skip */ }
+        if (!alive) { NavHistory.skip(dir); continue; }
+        const target = NavHistory.step(dir);
+        try { await openNoteInTab(target); } finally { NavHistory.endNavigate(); }
+        return;
+    }
+}
+
+function renderBreadcrumb(noteId) {
+    const b = document.getElementById('topbar-breadcrumb');
+    if (!b) return;
+    const parts = (typeof notePathParts === 'function') ? notePathParts(noteId) : [];
+    b.innerHTML = parts.map((p) =>
+        '<span class="crumb" data-id="' + p.id + '" title="' + escapeHtml(p.title) + '">' +
+        escapeHtml(p.title) + '</span>'
+    ).join('<span class="crumb-sep">›</span>');
+    b.classList.toggle('hidden', !parts.length);
+}
+
+function initNavigation() {
+    NavHistory.onChange = navUpdateButtons;
+
+    const back = document.getElementById('navBackBtn');
+    const fwd = document.getElementById('navFwdBtn');
+    if (back) back.addEventListener('click', () => navStep(-1));
+    if (fwd) fwd.addEventListener('click', () => navStep(1));
+
+    const b = document.getElementById('topbar-breadcrumb');
+    if (b) {
+        b.addEventListener('click', async (e) => {
+            const crumb = e.target.closest('.crumb');
+            if (!crumb) return;
+            await openNoteInTab(Number(crumb.dataset.id));
+        });
+    }
+
+    /* Global keyboard: Alt+←/→ history, Ctrl+. tree escape */
+    document.addEventListener('keydown', (e) => {
+        if (e.altKey && e.key === 'ArrowLeft') {
+            e.preventDefault(); // RTNote history, not browser history
+            navStep(-1);
+        } else if (e.altKey && e.key === 'ArrowRight') {
+            e.preventDefault();
+            navStep(1);
+        } else if (e.ctrlKey && e.key === '.') {
+            e.preventDefault();
+            if (App.currentNoteId != null && typeof revealNoteInTree === 'function') {
+                revealNoteInTree(App.currentNoteId);
+            }
+            const treeEl = document.getElementById('note-tree');
+            if (treeEl) treeEl.focus();
+        }
+    });
+
+    navUpdateButtons();
+}
+
 /* ── New Note type picker (topbar + button) ── */
 function initNewNoteMenu() {
     const btn = document.getElementById('newNoteBtn');

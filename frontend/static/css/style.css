@@ -258,6 +258,19 @@
   .topbar__title { font-size: 14px; font-weight: 600; color: var(--text-1); }
   .topbar__breadcrumb { font-size: 11px; color: var(--text-3); margin-top: 2px; }
   .topbar__actions { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+  /* Navigation (GUI-2): back/forward live left of the note identity */
+  .topbar__nav { display: flex; gap: 2px; align-items: center; }
+  .topbar__nav .btn-icon[disabled] { opacity: .35; cursor: default; }
+  .topbar__nav .btn-icon[disabled]:hover { background: transparent; }
+  /* Clickable breadcrumbs */
+  .topbar__breadcrumb {
+    font-size: 11px; color: var(--text-3); margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 52vw;
+  }
+  .topbar__breadcrumb .crumb { cursor: pointer; border-radius: var(--radius-sm); padding: 0 2px; }
+  .topbar__breadcrumb .crumb:hover { color: var(--text-1); background: var(--bg-hover); text-decoration: underline; }
+  .topbar__breadcrumb .crumb-sep { margin: 0 4px; opacity: .5; }
   /* Note actions vs app-shell controls: same row, separated by a divider so
      the information hierarchy is visible at a glance. */
   .topbar__note-actions { display: flex; gap: 4px; align-items: center; margin-left: auto; }

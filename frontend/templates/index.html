@@ -36,7 +36,7 @@
          so basicSetup is composed from the scoped packages instead. -->
 
     <!-- App styles -->
-    <link rel="stylesheet" href="/static/css/style.css?v=20">
+    <link rel="stylesheet" href="/static/css/style.css?v=21">
     <link rel="stylesheet" href="/static/css/themes.css?v=19">
     <link rel="stylesheet" href="/static/css/chat.css?v=3">
 </head>
@@ -86,9 +86,13 @@
 
         <div id="main-pane" class="main">
             <div class="topbar">
+                <div class="topbar__nav">
+                    <button class="btn btn-ghost btn-icon" id="navBackBtn" title="Back (Alt+←)" aria-label="Back" data-testid="nav-back" disabled><i class='bx bx-left-arrow-alt'></i></button>
+                    <button class="btn btn-ghost btn-icon" id="navFwdBtn" title="Forward (Alt+→)" aria-label="Forward" data-testid="nav-forward" disabled><i class='bx bx-right-arrow-alt'></i></button>
+                </div>
                 <div>
                     <div class="topbar__title" id="topbar-title">Meeting Notes</div>
-                    <div class="topbar__breadcrumb hidden" id="topbar-breadcrumb">Home > Work > Project Alpha</div>
+                    <div class="topbar__breadcrumb hidden" id="topbar-breadcrumb"></div>
                 </div>
                 <!-- Per-note actions -->
                 <div class="topbar__actions topbar__note-actions">
@@ -260,12 +264,13 @@
     <!-- App modules (order matters: logger → api → ui → tree → editor → search → main) -->
     <script src="/static/js/logger.js?v=1"></script>
     <script src="/static/js/chat-core.js?v=3"></script>
-    <script src="/static/js/api.js?v=19"></script>
-    <script src="/static/js/ui.js?v=20"></script>
-    <script src="/static/js/tree.js?v=19"></script>
-    <script src="/static/js/editor.js?v=19"></script>
-    <script src="/static/js/search.js?v=19"></script>
-    <script src="/static/js/main.js?v=19"></script>
+    <script src="/static/js/history.js?v=1"></script>
+    <script src="/static/js/api.js?v=21"></script>
+    <script src="/static/js/ui.js?v=21"></script>
+    <script src="/static/js/tree.js?v=21"></script>
+    <script src="/static/js/editor.js?v=21"></script>
+    <script src="/static/js/search.js?v=21"></script>
+    <script src="/static/js/main.js?v=21"></script>
 </body>
 </html>
 

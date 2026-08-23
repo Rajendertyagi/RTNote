@@ -10,9 +10,35 @@ function openQuickSearch() {
     overlay.classList.remove('hidden');
     const inp = document.getElementById('quickSearchInput');
     if (inp) { inp.value = ''; inp.focus(); }
-    document.getElementById('quickSearchResults').innerHTML = '';
+    renderRecentNotes();
     quickSearchResults = [];
     quickSearchIndex = -1;
+}
+
+/* Empty-query state: recently visited notes (jump-to-note, Trilium's
+   Ctrl+J pattern merged into our existing Ctrl+K overlay). */
+function renderRecentNotes() {
+    const container = document.getElementById('quickSearchResults');
+    if (!container) return;
+    const ids = (typeof NavHistory !== 'undefined') ? NavHistory.recent(8) : [];
+    if (!ids.length) {
+        container.innerHTML = '<div class="qs-empty">Type to search notes…</div>';
+        return;
+    }
+    container.innerHTML = ids.map((id) => {
+        const title = (typeof noteTitleById === 'function') ? noteTitleById(id) : ('Note ' + id);
+        const path = (typeof notePathParts === 'function')
+            ? notePathParts(id).map((p) => p.title).join(' › ') : '';
+        return '<div class="qs-result" data-id="' + id + '">' +
+            '<div class="qs-result-title">' + escapeHtml(title) + '</div>' +
+            '<div class="qs-result-path">' + escapeHtml(path) + '</div></div>';
+    }).join('');
+    container.querySelectorAll('.qs-result').forEach((el) => {
+        el.addEventListener('click', () => {
+            openNoteInTab(parseInt(el.dataset.id, 10));
+            closeQuickSearch();
+        });
+    });
 }
 
 function closeQuickSearch() {
@@ -82,14 +108,21 @@ function initSearch() {
             clearTimeout(quickSearchDebounce);
             const q = this.value.trim();
             if (!q) {
-                document.getElementById('quickSearchResults').innerHTML = '';
+                renderRecentNotes(); // back to the recent-notes jump list
                 quickSearchResults = [];
                 quickSearchIndex = -1;
                 return;
             }
             quickSearchDebounce = setTimeout(async () => {
                 try {
-                    quickSearchResults = await apiSearch(q);
+                    const results = await apiSearch(q);
+                    // Title matches first — jump-to-note intent outranks
+                    // content matches (small client-side ranking only).
+                    const ql = q.toLowerCase();
+                    results.sort((a, b) =>
+                        (b.title.toLowerCase().includes(ql) ? 1 : 0) -
+                        (a.title.toLowerCase().includes(ql) ? 1 : 0));
+                    quickSearchResults = results;
                     quickSearchIndex = -1;
                     renderQuickResults(quickSearchResults, q);
                 } catch (e) {
@@ -108,10 +141,14 @@ function initSearch() {
                 e.preventDefault();
                 quickSearchIndex = Math.max(quickSearchIndex - 1, 0);
                 highlightQuickResult();
-            } else if (e.key === 'Enter' && quickSearchIndex >= 0) {
+            } else if (e.key === 'Enter') {
                 e.preventDefault();
-                openNoteInTab(parseInt(quickSearchResults[quickSearchIndex].id, 10));
-                closeQuickSearch();
+                // Enter with no explicit selection opens the first result
+                const idx = quickSearchIndex >= 0 ? quickSearchIndex : 0;
+                if (quickSearchResults[idx]) {
+                    openNoteInTab(parseInt(quickSearchResults[idx].id, 10));
+                    closeQuickSearch();
+                }
             }
         });
     }

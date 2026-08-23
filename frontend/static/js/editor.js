@@ -142,15 +142,7 @@ function editorSetContent(html) {
 
 function setTopbar(title) {
     const t = document.getElementById('topbar-title');
-    const b = document.getElementById('topbar-breadcrumb');
     if (t) t.textContent = title;
-    // Breadcrumb shows the ancestor path (GUI-2 makes it clickable); the
-    // title alone is not a path.
-    if (b) {
-        const segs = (typeof notePath === 'function') ? notePath(title ? App.currentNoteId : null) : [];
-        b.textContent = segs.join(' › ');
-        b.classList.toggle('hidden', !segs.length);
-    }
 }
 
 async function openNoteInEditor(noteId) {
@@ -162,6 +154,16 @@ async function openNoteInEditor(noteId) {
         setTopbar(note.title);
         setSaveState('ready');
         updateTabTitle(note.id, note.title);
+        updateBookmarkStar();
+
+        /* Navigation coordination (GUI-2): openNoteInEditor is the single
+           choke point every entry path flows through — tree click, search,
+           breadcrumb, history, tab restore — so history recording and tree
+           sync live here and nowhere else. */
+        if (typeof NavHistory !== 'undefined') NavHistory.push(note.id);
+        if (typeof navUpdateButtons === 'function') navUpdateButtons();
+        if (typeof renderBreadcrumb === 'function') renderBreadcrumb(note.id);
+        if (typeof revealNoteInTree === 'function') revealNoteInTree(note.id);
         updateBookmarkStar();
 
         if (App.currentNoteType === 'mermaid') {

@@ -41,6 +41,41 @@ function buildTreeSource(notes) {
 /* Fetch notes first, then build the tree with a real source — no races */
 let _notesCache = []; // flat rows; powers breadcrumb paths without refetching
 
+/* Ancestors of a note as [{id, title}], nearest parent first. Missing
+   (deleted) ancestors simply end the walk — graceful by construction. */
+function notePathParts(noteId) {
+    const byId = new Map(_notesCache.map((n) => [n.id, n]));
+    const parts = [];
+    let cur = byId.get(Number(noteId));
+    let guard = 0;
+    while (cur && cur.parent_id != null && guard++ < 32) {
+        cur = byId.get(cur.parent_id);
+        if (cur) parts.unshift({ id: cur.id, title: cur.title });
+    }
+    return parts;
+}
+
+function noteTitleById(noteId) {
+    const n = _notesCache.find((r) => r.id === Number(noteId));
+    return n ? n.title : '';
+}
+
+/* Expand ancestors, scroll to, and select the active note's tree node.
+   Called from openNoteInEditor so EVERY entry path (tree click, search,
+   breadcrumb, history, tab restore) keeps the tree synchronized. */
+function revealNoteInTree(noteId) {
+    const tree = mar10.Wunderbaum.getTree('note-tree');
+    if (!tree) return;
+    const node = tree.findKey(String(Number(noteId)));
+    if (!node) return;
+    _treeReloadGuard = true; // programmatic selection must not re-open the note
+    try {
+        if (typeof node.reveal === 'function') node.reveal();
+        if (typeof node.setSelected === 'function') node.setSelected(true);
+    } catch (e) { /* older builds: best effort */ }
+    setTimeout(() => { _treeReloadGuard = false; }, 250);
+}
+
 function notePath(noteId) {
     const byId = new Map(_notesCache.map((n) => [n.id, n]));
     const parts = [];
@@ -67,6 +102,21 @@ async function initTree() {
     } catch (err) {
         console.error('Failed to load notes for tree:', err);
     }
+
+    // Backspace with tree focus → jump to the parent note (Trilium pattern).
+    // Root-level notes are a no-op; never fires while typing elsewhere
+    // because the listener is scoped to the tree container.
+    el.addEventListener('keydown', (e) => {
+        if (e.key !== 'Backspace') return;
+        const t = mar10.Wunderbaum.getTree('note-tree');
+        const node = t && typeof t.getActiveNode === 'function' ? t.getActiveNode() : null;
+        if (!node) return;
+        const id = Number(node.key);
+        const meta = _notesCache.find((n) => n.id === id);
+        if (!meta || meta.parent_id == null) return; // root-level: no-op
+        e.preventDefault();
+        openNoteInTab(meta.parent_id);
+    });
 
     new mar10.Wunderbaum({
         id: 'note-tree',

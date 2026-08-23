@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initTrash();
         initNewNoteMenu();
         initNoteMenu();
+        initNavigation();
 
         /* Launcher rail — every visible icon is a real destination */
         const searchBtn = document.getElementById('launcherSearch');
