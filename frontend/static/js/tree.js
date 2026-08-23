@@ -148,12 +148,15 @@ async function initTree() {
             },
         },
         activate: (e) => {
-            // Ignore programmatic activations (tree reload restores the active
-            // node and re-fires this) — only respond to real user clicks/keys.
-            // Wunderbaum exposes the originating UI event as `originalEvent`.
+            // Programmatic activations (tree reload restoring the active
+            // node) carry no UI event — ignore those. During the post-reload
+            // guard window, also ignore re-activations of the CURRENT note
+            // (Wunderbaum sometimes refires with an event attached); real
+            // clicks on other notes must always pass.
             const ev = e.originalEvent || e.event;
-            if (!ev || _treeReloadGuard) return;
+            if (!ev) return;
             const id = parseInt(e.node.key, 10);
+            if (_treeReloadGuard && id === Number(App.currentNoteId)) return;
             if (!isNaN(id)) openNoteInTab(id);
         },
     });

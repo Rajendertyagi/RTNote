@@ -107,12 +107,18 @@ function initSearch() {
         qsInput.addEventListener('input', function () {
             clearTimeout(quickSearchDebounce);
             const q = this.value.trim();
+            const resultsEl = document.getElementById('quickSearchResults');
             if (!q) {
                 renderRecentNotes(); // back to the recent-notes jump list
                 quickSearchResults = [];
                 quickSearchIndex = -1;
                 return;
             }
+            // Clear stale recents immediately so Enter can't act on them
+            // while the debounced search is still in flight.
+            if (resultsEl) resultsEl.innerHTML = '<div class="qs-empty">Searching…</div>';
+            quickSearchResults = [];
+            quickSearchIndex = -1;
             quickSearchDebounce = setTimeout(async () => {
                 try {
                     const results = await apiSearch(q);
