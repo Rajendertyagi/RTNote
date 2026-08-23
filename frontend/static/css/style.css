@@ -258,6 +258,21 @@
   .topbar__title { font-size: 14px; font-weight: 600; color: var(--text-1); }
   .topbar__breadcrumb { font-size: 11px; color: var(--text-3); margin-top: 2px; }
   .topbar__actions { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+  /* Note actions vs app-shell controls: same row, separated by a divider so
+     the information hierarchy is visible at a glance. */
+  .topbar__note-actions { display: flex; gap: 4px; align-items: center; margin-left: auto; }
+  .topbar__app-actions {
+    display: flex; gap: 6px; align-items: center;
+    padding-left: 10px; margin-left: 6px;
+    border-left: 1px solid var(--border-light);
+  }
+  .topbar__app-actions select { height: 28px; font-size: 11px; }
+  .note-menu-wrap { position: relative; display: inline-flex; }
+  .note-menu { display: none; } /* opens via .open, like the context menu */
+  .status-bar .st-dirty { color: var(--text-1); font-weight: 600; }
+  .status-bar .st-saving { color: var(--text-3); font-style: italic; }
+  .status-bar .st-saved { color: var(--text-3); }
+  .status-bar .st-error { color: var(--red, #f38ba8); cursor: pointer; font-weight: 600; }
   .content { flex: 1; overflow: auto; padding: 24px; background: var(--bg-main); }
   .status-bar { display: flex; justify-content: space-between; padding: 4px 12px; font-size: 11px; color: var(--text-3); border-top: 1px solid var(--border-light); background: var(--bg-main); }
   #left-pane { width: var(--w-sidebar); min-width: 200px; background: var(--bg-sidebar); display: flex; flex-direction: column; overflow: hidden; position: relative; }

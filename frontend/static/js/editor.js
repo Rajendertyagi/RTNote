@@ -144,7 +144,13 @@ function setTopbar(title) {
     const t = document.getElementById('topbar-title');
     const b = document.getElementById('topbar-breadcrumb');
     if (t) t.textContent = title;
-    if (b) b.textContent = title;
+    // Breadcrumb shows the ancestor path (GUI-2 makes it clickable); the
+    // title alone is not a path.
+    if (b) {
+        const segs = (typeof notePath === 'function') ? notePath(title ? App.currentNoteId : null) : [];
+        b.textContent = segs.join(' › ');
+        b.classList.toggle('hidden', !segs.length);
+    }
 }
 
 async function openNoteInEditor(noteId) {
@@ -154,6 +160,7 @@ async function openNoteInEditor(noteId) {
         App.currentNoteType = note.type || 'text';
         tableViewOn = false; // opening a note always returns to its own view
         setTopbar(note.title);
+        setSaveState('ready');
         updateTabTitle(note.id, note.title);
         updateBookmarkStar();
 
@@ -182,18 +189,38 @@ async function openNoteInEditor(noteId) {
 
 function scheduleSave() {
     if (!App.currentNoteId) return;
+    setSaveState('dirty');
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(saveNoteNow, 800);
 }
 
+/* ── Save-state feedback (status bar, not toasts) ───────────────
+   dirty → saving → saved | error. The error state is clickable
+   (retries the save); success never fires a toast — autosave runs
+   constantly and toasts would be noise. */
+function setSaveState(state) {
+    const el = document.getElementById('status-left');
+    if (!el) return;
+    el.classList.remove('st-dirty', 'st-saving', 'st-saved', 'st-error');
+    switch (state) {
+        case 'dirty':  el.textContent = 'Unsaved changes'; el.classList.add('st-dirty'); break;
+        case 'saving': el.textContent = 'Saving…'; el.classList.add('st-saving'); break;
+        case 'saved':  el.textContent = 'Saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); el.classList.add('st-saved'); break;
+        case 'error':  el.textContent = 'Save failed — click to retry'; el.classList.add('st-error'); break;
+        default:       el.textContent = 'Ready';
+    }
+}
+
 async function saveNoteNow() {
     if (!App.currentNoteId) return;
+    setSaveState('saving');
     const content = getContentForType(App.currentNoteType || 'text');
     try {
         await apiUpdateNote(App.currentNoteId, { content: content });
-        showToast('Note saved', 'success');
+        setSaveState('saved');
     } catch (err) {
         console.error('Save failed:', err);
+        setSaveState('error');
         showToast('Save failed', 'error');
     }
 }

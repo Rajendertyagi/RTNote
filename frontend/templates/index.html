@@ -36,20 +36,16 @@
          so basicSetup is composed from the scoped packages instead. -->
 
     <!-- App styles -->
-    <link rel="stylesheet" href="/static/css/style.css?v=18">
-    <link rel="stylesheet" href="/static/css/themes.css?v=18">
+    <link rel="stylesheet" href="/static/css/style.css?v=19">
+    <link rel="stylesheet" href="/static/css/themes.css?v=19">
     <link rel="stylesheet" href="/static/css/chat.css?v=3">
 </head>
 <body>
     <div class="app">
         <div class="launcher">
-            <div class="ic active" title="Notes"><i class='bx bx-note'></i></div>
-            <div class="ic" title="Search"><i class='bx bx-search'></i></div>
+            <div class="ic active" id="launcherNotes" title="Notes"><i class='bx bx-note'></i></div>
+            <div class="ic" id="launcherSearch" title="Search (Ctrl+K)"><i class='bx bx-search'></i></div>
             <div class="ic" title="Calendar" id="launcherCalendar"><i class='bx bx-calendar'></i></div>
-            <div class="ic" title="Board"><i class='bx bx-layout'></i></div>
-            <div class="spacer"></div>
-            <div class="ic" title="Recent"><i class='bx bx-clock'></i></div>
-            <div class="ic" title="Settings"><i class='bx bx-cog'></i></div>
         </div>
 
         <div id="left-pane">
@@ -92,10 +88,27 @@
             <div class="topbar">
                 <div>
                     <div class="topbar__title" id="topbar-title">Meeting Notes</div>
-                    <div class="topbar__breadcrumb" id="topbar-breadcrumb">Home > Work > Project Alpha</div>
+                    <div class="topbar__breadcrumb hidden" id="topbar-breadcrumb">Home > Work > Project Alpha</div>
                 </div>
-                <div class="topbar__actions">
-                    <select id="themeSelect">
+                <!-- Per-note actions -->
+                <div class="topbar__actions topbar__note-actions">
+                    <button class="btn btn-ghost btn-icon" id="bookmarkBtn" title="Bookmark this note"><i class='bx bx-star'></i></button>
+                    <button class="btn btn-ghost btn-icon" id="uploadFileBtn" title="Attach file"><i class='bx bx-paperclip'></i></button>
+                    <input type="file" id="fileInput" multiple style="display:none">
+                    <button class="btn btn-ghost btn-icon" id="tableViewBtn" title="Table view (children)"><i class='bx bx-table'></i></button>
+                    <button class="btn btn-ghost btn-icon" id="newNoteBtn" title="New Note"><i class='bx bx-plus'></i></button>
+                    <div class="note-menu-wrap">
+                        <button class="btn btn-ghost btn-icon" id="noteMenuBtn" title="Note actions" aria-label="Note actions" data-testid="note-menu-btn"><i class='bx bx-dots-horizontal-rounded'></i></button>
+                        <div class="context-menu note-menu" id="noteMenu">
+                            <div class="context-menu-item" data-action="duplicate"><i class="bx bx-copy icon"></i> Duplicate note</div>
+                            <div class="context-menu-sep"></div>
+                            <div class="context-menu-item danger" data-action="delete"><i class="bx bx-trash icon"></i> Delete note</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- App-shell controls, visually separated from note actions -->
+                <div class="topbar__app-actions">
+                    <select id="themeSelect" title="Theme">
                         <option value="notion-light">Notion Light</option>
                         <option value="github-light">GitHub Light</option>
                         <option value="catppuccin-latte">Catppuccin Latte</option>
@@ -107,11 +120,6 @@
                         <option value="tokyo-night">Tokyo Night</option>
                         <option value="gruvbox-dark">Gruvbox Dark</option>
                     </select>
-                    <button class="btn btn-ghost btn-icon" id="bookmarkBtn" title="Bookmark this note"><i class='bx bx-star'></i></button>
-                    <button class="btn btn-ghost btn-icon" id="uploadFileBtn" title="Attach file"><i class='bx bx-paperclip'></i></button>
-                    <input type="file" id="fileInput" multiple style="display:none">
-                    <button class="btn btn-ghost btn-icon" id="tableViewBtn" title="Table view (children)"><i class='bx bx-table'></i></button>
-                    <button class="btn btn-ghost btn-icon" id="newNoteBtn" title="New Note"><i class='bx bx-plus'></i></button>
                     <button class="btn btn-ghost btn-icon" title="Toggle Right Sidebar" onclick="toggleRightSidebar()"><i class='bx bx-sidebar'></i></button>
                 </div>
             </div>
@@ -252,12 +260,12 @@
     <!-- App modules (order matters: logger → api → ui → tree → editor → search → main) -->
     <script src="/static/js/logger.js?v=1"></script>
     <script src="/static/js/chat-core.js?v=3"></script>
-    <script src="/static/js/api.js?v=18"></script>
-    <script src="/static/js/ui.js?v=18"></script>
-    <script src="/static/js/tree.js?v=18"></script>
-    <script src="/static/js/editor.js?v=18"></script>
-    <script src="/static/js/search.js?v=18"></script>
-    <script src="/static/js/main.js?v=18"></script>
+    <script src="/static/js/api.js?v=19"></script>
+    <script src="/static/js/ui.js?v=19"></script>
+    <script src="/static/js/tree.js?v=19"></script>
+    <script src="/static/js/editor.js?v=19"></script>
+    <script src="/static/js/search.js?v=19"></script>
+    <script src="/static/js/main.js?v=19"></script>
 </body>
 </html>
 

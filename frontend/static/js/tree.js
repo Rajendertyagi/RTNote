@@ -39,6 +39,20 @@ function buildTreeSource(notes) {
 }
 
 /* Fetch notes first, then build the tree with a real source — no races */
+let _notesCache = []; // flat rows; powers breadcrumb paths without refetching
+
+function notePath(noteId) {
+    const byId = new Map(_notesCache.map((n) => [n.id, n]));
+    const parts = [];
+    let cur = byId.get(Number(noteId));
+    let guard = 0;
+    while (cur && cur.parent_id != null && guard++ < 32) {
+        cur = byId.get(cur.parent_id);
+        if (cur) parts.unshift(cur.title);
+    }
+    return parts;
+}
+
 async function initTree() {
     const el = document.getElementById('note-tree');
     if (!el || typeof mar10 === 'undefined' || !mar10.Wunderbaum) {
@@ -48,7 +62,8 @@ async function initTree() {
 
     let source = [];
     try {
-        source = buildTreeSource(await apiListNotes());
+        _notesCache = await apiListNotes();
+        source = buildTreeSource(_notesCache);
     } catch (err) {
         console.error('Failed to load notes for tree:', err);
     }
@@ -93,9 +108,9 @@ async function refreshTree() {
     const tree = mar10.Wunderbaum.getTree('note-tree');
     if (!tree) return;
     try {
-        const notes = await apiListNotes();
+        _notesCache = await apiListNotes();
         _treeReloadGuard = true;
-        tree.reload(buildTreeSource(notes));
+        tree.reload(buildTreeSource(_notesCache));
         setTimeout(() => { _treeReloadGuard = false; }, 250);
     } catch (err) {
         console.error('Tree refresh failed:', err);

@@ -167,6 +167,37 @@ function initNewNoteMenu() {
     document.addEventListener('click', () => menu.classList.remove('open'));
 }
 
+/* ── ⋯ note-actions menu (secondary per-note operations) ── */
+function initNoteMenu() {
+    const btn = document.getElementById('noteMenuBtn');
+    const menu = document.getElementById('noteMenu');
+    if (!btn || !menu) return;
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const r = btn.getBoundingClientRect();
+        // Open leftward-aligned under the button, clamped to the window
+        menu.style.left = Math.max(8, r.right - menu.offsetWidth) + 'px';
+        menu.style.top = (r.bottom + 4) + 'px';
+        menu.classList.toggle('open');
+    });
+
+    menu.addEventListener('click', async (e) => {
+        const item = e.target.closest('.context-menu-item');
+        if (!item) return;
+        menu.classList.remove('open');
+        const noteId = App.currentNoteId != null ? Number(App.currentNoteId) : null;
+        if (noteId == null) { showToast('Open a note first', 'error'); return; }
+        if (item.dataset.action === 'duplicate') await duplicateNoteFlow(noteId);
+        if (item.dataset.action === 'delete') {
+            const title = TabState.open.find((t) => t.id === noteId)?.title || '';
+            await deleteNoteFlow(noteId, title);
+        }
+    });
+
+    document.addEventListener('click', () => menu.classList.remove('open'));
+}
+
 /* ── Right sidebar ── */
 function switchRightTab(name) {
     document.querySelectorAll('.right-sidebar .tab').forEach((t) => t.classList.remove('active'));

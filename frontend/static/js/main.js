@@ -10,6 +10,23 @@ document.addEventListener('DOMContentLoaded', () => {
         initContextMenu();
         initTrash();
         initNewNoteMenu();
+        initNoteMenu();
+
+        /* Launcher rail — every visible icon is a real destination */
+        const searchBtn = document.getElementById('launcherSearch');
+        if (searchBtn) searchBtn.addEventListener('click', openQuickSearch);
+        const calBtn = document.getElementById('launcherCalendar');
+        if (calBtn) calBtn.addEventListener('click', toggleCalendar);
+
+        /* Status bar: clicking a failed save state retries the save.
+           Wired here (not in initEditor) so it works even if the editor
+           library fails to load — it is shell chrome, not editor internals. */
+        const statusLeft = document.getElementById('status-left');
+        if (statusLeft) {
+            statusLeft.addEventListener('click', () => {
+                if (statusLeft.classList.contains('st-error') && typeof saveNoteNow === 'function') saveNoteNow();
+            });
+        }
 
         /* Resizable panes */
         if (typeof Split !== 'undefined') {
@@ -30,8 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof initChatMiniToolbar === 'function') initChatMiniToolbar();
 
         /* Launcher: Calendar opens the month-view panel (events + day notes) */
-        const calBtn = document.getElementById('launcherCalendar');
-        if (calBtn) calBtn.addEventListener('click', toggleCalendar);
         const closeCal = document.getElementById('closeCalendarBtn');
         if (closeCal) closeCal.addEventListener('click', toggleCalendar);
         const calOverlay = document.getElementById('calendarOverlay');
