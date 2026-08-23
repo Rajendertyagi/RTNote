@@ -32,15 +32,6 @@ function diag(page: import("@playwright/test").Page) {
   return errs.length ? ` [errors: ${errs.join(" | ")}]` : "";
 }
 
-async function traceDiag(page: import("@playwright/test").Page) {
-  const errs = (page as unknown as { _gui4Errors?: string[] })._gui4Errors ?? [];
-  const trace = await page.evaluate(() => ({
-    trace: (window as unknown as { __tTrace?: unknown[] }).__tTrace ?? [],
-    kbdBound: (window as unknown as { _treeKbdBound?: boolean })._treeKbdBound ?? null,
-  }));
-  return ` [trace: ${JSON.stringify(trace)}${errs.length ? " | errors: " + errs.join(" | ") : ""}]`;
-}
-
 /* Element-order in the tree (NOT string indexOf on joined text) */
 async function treeRowIndex(page: import("@playwright/test").Page, title: string) {
   return page.evaluate((t) => {
@@ -76,11 +67,17 @@ test.describe("Tree keyboard movement", () => {
     await page.keyboard.press("Control+ArrowUp");
     await expect(page.locator("#topbar-title")).toContainText(`K3 ${u}`); // stays open
 
-    const k3Idx = await treeRowIndex(page, `K3 ${u}`);
-    const k2Idx = await treeRowIndex(page, `K2 ${u}`);
-    const k1Idx = await treeRowIndex(page, `K1 ${u}`);
-    expect(k3Idx, await traceDiag(page)).toBeLessThan(k2Idx);
-    expect(k1Idx, await traceDiag(page)).toBeLessThan(k3Idx);
+    // The move + tree refresh complete asynchronously — poll until the DOM
+    // reflects the new sibling order (retrying assertion, no sleeps).
+    const k3Idx = () => treeRowIndex(page, `K3 ${u}`);
+    const k2Idx = () => treeRowIndex(page, `K2 ${u}`);
+    const k1Idx = () => treeRowIndex(page, `K1 ${u}`);
+    await expect
+      .poll(async () => (await k3Idx()) < (await k2Idx()), { timeout: 10000 })
+      .toBe(true);
+    await expect
+      .poll(async () => (await k1Idx()) < (await k3Idx()), { timeout: 10000 })
+      .toBe(true);
 
     // Server state matches the UI
     const notes = await (await request.get("/api/notes")).json();
@@ -163,9 +160,11 @@ test.describe("Tree context menu & dialog", () => {
     await page.locator('#ctxMenu .context-menu-item[data-action="move-up"]').click();
     await expect(page.locator("#topbar-title")).toContainText(`CMB ${u}`);
 
-    const cmbIdx = await treeRowIndex(page, `CMB ${u}`);
-    const cmaIdx = await treeRowIndex(page, `CMA ${u}`);
-    expect(cmbIdx, await traceDiag(page)).toBeLessThan(cmaIdx);
+    const cmbIdx = () => treeRowIndex(page, `CMB ${u}`);
+    const cmaIdx = () => treeRowIndex(page, `CMA ${u}`);
+    await expect
+      .poll(async () => (await cmbIdx()) < (await cmaIdx()), { timeout: 10000 })
+      .toBe(true);
   });
 
   test("Move to… dialog reparents and persists across reload", async ({ page, request }) => {
@@ -246,12 +245,19 @@ test.describe("Tree drag & drop", () => {
 
     await html5Drag(page, `DragSrc ${u}`, `DragDst ${u}`, "over");
 
-    // Server is the authority: verify the hierarchy changed
-    const notes = await (await request.get("/api/notes")).json();
-    const srcNote = (notes as Array<{ title: string; parent_id: number | null }>).find(
-      (n) => n.title === `DragSrc ${u}`
-    );
-    expect(srcNote?.parent_id, diag(page)).toBe(dest.id);
+    // Server is the authority: verify the hierarchy changed (async completion)
+    await expect
+      .poll(
+        async () => {
+          const notes = await (await request.get("/api/notes")).json();
+          const srcNote = (notes as Array<{ title: string; parent_id: number | null }>).find(
+            (n) => n.title === `DragSrc ${u}`
+          );
+          return srcNote?.parent_id ?? null;
+        },
+        { timeout: 10000 }
+      )
+      .toBe(dest.id);
   });
 
   test("reordering via drop between siblings updates positions", async ({ page, request }) => {
@@ -265,10 +271,17 @@ test.describe("Tree drag & drop", () => {
 
     await html5Drag(page, `OrdC ${u}`, `OrdA ${u}`, "before");
 
-    const notes = await (await request.get("/api/notes")).json();
-    const c = (notes as Array<{ title: string; position: number }>).find(
-      (n) => n.title === `OrdC ${u}`
-    );
-    expect(c?.position).toBe(0);
+    await expect
+      .poll(
+        async () => {
+          const notes = await (await request.get("/api/notes")).json();
+          const c = (notes as Array<{ title: string; position: number }>).find(
+            (n) => n.title === `OrdC ${u}`
+          );
+          return c?.position ?? -1;
+        },
+        { timeout: 10000 }
+      )
+      .toBe(0);
   });
 });

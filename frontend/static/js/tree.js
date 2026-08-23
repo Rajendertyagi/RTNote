@@ -69,12 +69,10 @@ function isDescendantOf(descId, ancestorId) {
    Returns true on success; failures surface as a toast (never silent). */
 /* Single flow for every tree mutation: API → refresh choke point → reveal.
    Returns true on success; failures surface as a toast (never silent).
-   Reentrancy lock: multiple keydown bindings must not double-fire a move.
-   (window.__tTrace is temporary diagnostics for GUI-4 verification.) */
+   Reentrancy lock: multiple keydown bindings must not double-fire a move. */
 let _moveInFlight = false;
 async function moveNoteFlow(noteId, parentId, position) {
-    try { window.__tTrace.push({ at: 'moveNoteFlow', noteId, parentId, position }); } catch (e) {}
-    if (_moveInFlight) { try { window.__tTrace.push({ at: 'locked' }); } catch (e) {} return true; }
+    if (_moveInFlight) return true;
     _moveInFlight = true;
     try {
         await apiMoveNote(noteId, parentId, position);
@@ -96,7 +94,6 @@ async function moveNoteFlow(noteId, parentId, position) {
 
 /* Ctrl+Up / Ctrl+Down: swap position with the previous/next live sibling. */
 async function treeMoveRelative(noteId, delta) {
-    try { window.__tTrace.push({ at: 'treeMoveRelative', noteId, delta }); } catch (e) {}
     const meta = _notesCache.find((n) => n.id === Number(noteId));
     if (!meta) return;
     const sibs = liveSiblings(meta);
@@ -357,7 +354,6 @@ async function initTree() {
 /* GUI-4 keyboard tree movement handler (module scope: survives tree
    rebuilds; registered once via _treeKbdBound). */
 const handleTreeMoveKeydown = (e) => {
-    try { window.__tTrace.push({ at: 'kbd', key: e.key, ctrl: e.ctrlKey, tag: document.activeElement?.tagName }); } catch (err) {}
     if (!(e.ctrlKey && !e.shiftKey && !e.altKey)) return;
     if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
     const ae = document.activeElement;
