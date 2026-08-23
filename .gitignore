@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Databases (user data — never commit)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# Logs / temp
+*.log
+*.err
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
