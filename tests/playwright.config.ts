@@ -14,7 +14,10 @@ export default defineConfig({
   timeout: 30000,
   retries: process.env.CI ? 1 : 0,
   workers: 1, // single shared server DB — keep specs sequential
-  reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
+  // "github" reporter emits per-test failure details as check-run
+  // annotations — readable via the public API without authenticated
+  // log downloads (AI-agent debugging on a no-workflow-scope token).
+  reporter: process.env.CI ? [["list"], ["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: "http://127.0.0.1:8123",
     trace: "on-first-retry",
