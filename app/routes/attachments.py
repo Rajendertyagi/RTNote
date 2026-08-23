@@ -7,7 +7,7 @@ inline for known image mimes, attachment-disposition otherwise.
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import Response
 
-from app.database.notes_db import get_db
+from app.database.notes_db import db
 
 router = APIRouter(prefix="/api", tags=["attachments"])
 
@@ -24,29 +24,27 @@ def _meta_dict(r) -> dict:
 
 @router.get("/notes/{note_id}/attachments")
 async def list_attachments(note_id: int):
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT id, note_id, filename, mime, size, created_at FROM attachments "
-        "WHERE note_id=? ORDER BY id",
-        (note_id,),
-    ).fetchall()
-    conn.close()
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT id, note_id, filename, mime, size, created_at FROM attachments "
+            "WHERE note_id=? ORDER BY id",
+            (note_id,),
+        ).fetchall()
     return [_meta_dict(r) for r in rows]
 
 
 @router.post("/notes/{note_id}/attachments")
 async def upload_attachment(note_id: int, file: UploadFile):
-    conn = get_db()
-    try:
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File too large (max 20 MB)")
+
+    with db() as conn:
         note = conn.execute(
             "SELECT id FROM notes WHERE id=? AND deleted_at IS NULL", (note_id,)
         ).fetchone()
         if not note:
             raise HTTPException(status_code=404, detail="Note not found")
-
-        data = await file.read()
-        if len(data) > MAX_UPLOAD_BYTES:
-            raise HTTPException(status_code=413, detail="File too large (max 20 MB)")
 
         mime = file.content_type or "application/octet-stream"
         filename = file.filename or "unnamed"
@@ -54,20 +52,17 @@ async def upload_attachment(note_id: int, file: UploadFile):
             "INSERT INTO attachments (note_id, filename, mime, size, content) VALUES (?, ?, ?, ?, ?)",
             (note_id, filename, mime, len(data), data),
         )
-        conn.commit()
         att_id = cur.lastrowid
-        inline = mime in INLINE_MIMES
-        url = f"/api/attachments/{att_id}/image" if inline else f"/api/attachments/{att_id}/download"
-        return {"id": att_id, "filename": filename, "mime": mime,
-                "size": len(data), "url": url, "inline": inline}
-    finally:
-        conn.close()
+
+    inline = mime in INLINE_MIMES
+    url = f"/api/attachments/{att_id}/image" if inline else f"/api/attachments/{att_id}/download"
+    return {"id": att_id, "filename": filename, "mime": mime,
+            "size": len(data), "url": url, "inline": inline}
 
 
 def _fetch_attachment(att_id: int):
-    conn = get_db()
-    row = conn.execute("SELECT * FROM attachments WHERE id=?", (att_id,)).fetchone()
-    conn.close()
+    with db() as conn:
+        row = conn.execute("SELECT * FROM attachments WHERE id=?", (att_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Attachment not found")
     return row
@@ -102,8 +97,6 @@ async def download(attachment_id: int):
 
 @router.delete("/attachments/{attachment_id}")
 async def delete_attachment(attachment_id: int):
-    conn = get_db()
-    conn.execute("DELETE FROM attachments WHERE id=?", (attachment_id,))
-    conn.commit()
-    conn.close()
+    with db() as conn:
+        conn.execute("DELETE FROM attachments WHERE id=?", (attachment_id,))
     return {"deleted": True}

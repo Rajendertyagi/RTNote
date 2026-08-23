@@ -8,7 +8,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
 
-from app.database.notes_db import get_db
+from app.database.notes_db import db
 
 router = APIRouter(prefix="/api/days", tags=["days"])
 
@@ -35,8 +35,7 @@ async def get_day_note(date_str: str):
     except ValueError:
         raise HTTPException(status_code=400, detail="Date must be YYYY-MM-DD")
 
-    conn = get_db()
-    try:
+    with db() as conn:
         # Journal root (top-level)
         journal = conn.execute(
             "SELECT * FROM notes WHERE title='Journal' AND parent_id IS NULL AND deleted_at IS NULL LIMIT 1"
@@ -46,13 +45,10 @@ async def get_day_note(date_str: str):
 
         year_title = f"{dt.year}"
         month_title = f"{dt.year}-{dt.month:02d}"
-        day_title = date_str
 
         year = _find_child(conn, journal["id"], year_title) or _create(conn, year_title, journal["id"])
         month = _find_child(conn, year["id"], month_title) or _create(conn, month_title, year["id"])
-        day = _find_child(conn, month["id"], day_title) or _create(conn, day_title, month["id"])
-
-        conn.commit()
+        day = _find_child(conn, month["id"], date_str) or _create(conn, date_str, month["id"])
 
         return {
             "id": day["id"],
@@ -62,5 +58,3 @@ async def get_day_note(date_str: str):
             "type": day["type"],
             "created": day["created_at"] == day["updated_at"],
         }
-    finally:
-        conn.close()

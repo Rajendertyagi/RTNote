@@ -6,26 +6,24 @@ old parent chain is itself in the trash, the note is re-parented to top level.
 """
 from fastapi import APIRouter, HTTPException
 
-from app.database.notes_db import get_db
+from app.database.notes_db import db
 
 router = APIRouter(prefix="/api/trash", tags=["trash"])
 
 
 @router.get("")
 async def list_trash():
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT id, title, deleted_at, delete_id FROM notes "
-        "WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC"
-    ).fetchall()
-    conn.close()
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT id, title, deleted_at, delete_id FROM notes "
+            "WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC"
+        ).fetchall()
     return [dict(r) for r in rows]
 
 
 @router.post("/{note_id}/restore")
 async def restore_note(note_id: int):
-    conn = get_db()
-    try:
+    with db() as conn:
         note = conn.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
         if not note:
             raise HTTPException(status_code=404, detail="Note not found")
@@ -58,22 +56,17 @@ async def restore_note(note_id: int):
                 break
             pid = parent["parent_id"]
 
-        conn.commit()
-        return {"restored": True, "count": len(ids), "reparented_to_root": reparented}
-    finally:
-        conn.close()
+    return {"restored": True, "count": len(ids), "reparented_to_root": reparented}
 
 
 @router.post("/empty")
 async def empty_trash():
     """Physically erase ALL soft-deleted notes. FTS triggers keep the index in sync."""
-    conn = get_db()
-    try:
+    with db() as conn:
         roots = conn.execute(
             "SELECT id FROM notes WHERE deleted_at IS NOT NULL"
         ).fetchall()
 
-        all_ids: list[int] = []
         frontier = [r["id"] for r in roots]
         seen = set(frontier)
         while frontier:
@@ -90,7 +83,4 @@ async def empty_trash():
             placeholders = ",".join("?" * len(all_ids))
             conn.execute(f"DELETE FROM bookmarks WHERE note_id IN ({placeholders})", all_ids)
             conn.execute(f"DELETE FROM notes WHERE id IN ({placeholders})", all_ids)
-            conn.commit()
-        return {"erased": len(all_ids)}
-    finally:
-        conn.close()
+    return {"erased": len(all_ids)}

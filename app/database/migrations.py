@@ -93,12 +93,43 @@ def _m006_attachments_table(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_attachments_note ON attachments(note_id)")
 
 
+def _m007_fix_fts_triggers(conn):
+    """Root-cause fix: UPDATE is not a valid operation on external-content
+    FTS5 tables — it desyncs the index and later throws 'database disk image
+    is malformed'. Replace all sync triggers with the documented
+    delete-command + insert pattern, then rebuild the index."""
+    conn.execute("DROP TRIGGER IF EXISTS notes_ai")
+    conn.execute("DROP TRIGGER IF EXISTS notes_ad")
+    conn.execute("DROP TRIGGER IF EXISTS notes_au")
+    conn.execute("""
+        CREATE TRIGGER notes_ai AFTER INSERT ON notes BEGIN
+            INSERT INTO notes_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
+        END;
+    """)
+    conn.execute("""
+        CREATE TRIGGER notes_ad AFTER DELETE ON notes BEGIN
+            INSERT INTO notes_fts(notes_fts, rowid, title, content)
+                VALUES('delete', old.id, old.title, old.content);
+        END;
+    """)
+    conn.execute("""
+        CREATE TRIGGER notes_au AFTER UPDATE ON notes BEGIN
+            INSERT INTO notes_fts(notes_fts, rowid, title, content)
+                VALUES('delete', old.id, old.title, old.content);
+            INSERT INTO notes_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
+        END;
+    """)
+    # Resync the index from the content table (also heals any existing desync)
+    conn.execute("INSERT INTO notes_fts(notes_fts) VALUES('rebuild')")
+
+
 MIGRATIONS.extend([
     (2, "notes_soft_delete", _m002_notes_soft_delete),
     (3, "options_table", _m003_options_table),
     (4, "bookmarks_table", _m004_bookmarks_table),
     (5, "notes_event_dates", _m005_notes_event_dates),
     (6, "attachments_table", _m006_attachments_table),
+    (7, "fix_fts_triggers", _m007_fix_fts_triggers),
 ])
 
 
