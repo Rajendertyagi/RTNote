@@ -30,6 +30,8 @@ test.describe("Trash UI", () => {
     await request.delete(`/api/notes/${note.id}`);
 
     await page.goto("/");
+    // The Empty button asks for confirmation via window.confirm()
+    page.on("dialog", (d) => d.accept());
     await page.locator("#trashToggle").click();
     await page.locator("#emptyTrashBtn").click();
     await expect(page.locator("#trashItems")).not.toContainText("Gone Forever");
