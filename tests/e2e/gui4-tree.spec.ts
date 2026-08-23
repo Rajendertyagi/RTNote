@@ -243,6 +243,8 @@ test.describe("Tree drag & drop", () => {
     await page.goto("/");
     await waitForAppBoot(page);
 
+    const src = page.locator("#note-tree .wb-row", { hasText: `DragSrc ${u}` }).first();
+    const dst = page.locator("#note-tree .wb-row", { hasText: `DragDst ${u}` }).first();
     await src.dragTo(dst);
 
     // Server is the authority: verify the hierarchy changed (async completion)
@@ -269,6 +271,8 @@ test.describe("Tree drag & drop", () => {
     await page.goto("/");
     await waitForAppBoot(page);
 
+    const src = page.locator("#note-tree .wb-row", { hasText: `OrdC ${u}` }).first();
+    const dst = page.locator("#note-tree .wb-row", { hasText: `OrdA ${u}` }).first();
     await src.dragTo(dst);
 
     await expect
