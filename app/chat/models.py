@@ -65,8 +65,16 @@ EFFORT_LABELS = {
 
 @router.get("/models")
 async def list_models():
-    """Curated catalog + valid effort levels for the UI."""
-    return [
-        {**m, "effort_labels": {e: EFFORT_LABELS[e] for e in m["efforts"]}}
-        for m in MODELS
-    ]
+    """Curated catalog + valid effort levels + connection status for the UI."""
+    from app.chat.connections import is_configured, provider_for_model
+
+    result = []
+    for m in MODELS:
+        pid = provider_for_model(m["id"])
+        configured = bool(pid and is_configured(pid))
+        result.append({
+            **m,
+            "configured": configured,
+            "effort_labels": {e: EFFORT_LABELS[e] for e in m["efforts"]},
+        })
+    return result

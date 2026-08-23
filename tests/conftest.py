@@ -11,6 +11,7 @@ os.environ["NOTES_DB_PATH"] = os.path.join(_TMP_DIR, "notes.db")
 os.environ["CHAT_DATABASE_URL"] = (
     "sqlite+aiosqlite:///" + os.path.join(_TMP_DIR, "chat.db").replace("\\", "/")
 )
+os.environ["CONNECTIONS_PATH"] = os.path.join(_TMP_DIR, "connections.json")
 
 import pytest
 import pytest_asyncio
@@ -23,6 +24,16 @@ from app.chat.db import init_db as init_chat_db, dispose_engine
 
 
 # ---------- Notes DB ----------
+@pytest.fixture(autouse=True)
+def connections_store():
+    """Fresh connection-manager JSON store for every test."""
+    from app.config import CONNECTIONS_PATH
+
+    if CONNECTIONS_PATH.exists():
+        CONNECTIONS_PATH.unlink()
+    yield CONNECTIONS_PATH
+
+
 @pytest.fixture(autouse=True)
 def notes_db():
     """Fresh notes DB (schema + all migrations) for every test."""

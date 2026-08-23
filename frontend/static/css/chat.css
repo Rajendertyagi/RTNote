@@ -182,3 +182,44 @@
 .modal__actions .primary { background: var(--accent-dim, rgba(137,180,250,.3)); }
 
 .hidden { display: none !important; }
+
+/* ── Connections page ── */
+.conn-app { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
+.conn-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.conn-header h2 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.conn-header__actions { display: flex; gap: 8px; }
+.conn-header__actions a { text-decoration: none; color: inherit; }
+.conn-sub { font-size: 13px; opacity: .65; }
+.conn-sub code { background: var(--bg-secondary, rgba(128,128,128,.12)); padding: 1px 5px; border-radius: 4px; }
+.conn-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 14px;
+    margin-top: 16px;
+}
+.conn-card {
+    border: 1px solid var(--border, #333);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.conn-card__head { display: flex; justify-content: space-between; align-items: center; }
+.conn-card__name { font-weight: 600; }
+.conn-status { font-size: 12px; }
+.conn-status.ok { color: #a6e3a1; }
+.conn-status.off { opacity: .55; }
+.conn-card label { font-size: 12px; opacity: .7; margin-top: 4px; }
+.conn-card .opt { opacity: .5; }
+.conn-card input {
+    background: var(--bg-secondary, transparent);
+    color: inherit;
+    border: 1px solid var(--border, #444);
+    border-radius: 6px;
+    padding: 7px 9px;
+    font-size: 13px;
+}
+.conn-card__actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.conn-result { font-size: 12px; opacity: .85; word-break: break-all; }
+.btn-sm.danger { color: var(--red, #f38ba8); }

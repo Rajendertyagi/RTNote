@@ -144,7 +144,11 @@ class MemoryManager:
         self.messages.append({"role": "user", "content": content})
 
     def _completion_kwargs(self, **extra) -> dict:
-        """Common kwargs for LLM calls; reasoning_effort only when set."""
+        """Common kwargs for LLM calls; reasoning_effort only when set.
+
+        Saved provider credentials (connection manager) take precedence;
+        LiteLLM falls back to env vars when no api_key is passed.
+        """
         kwargs = {
             "model": self.model,
             "messages": self.messages,
@@ -152,6 +156,18 @@ class MemoryManager:
         }
         if self.reasoning_effort:
             kwargs["reasoning_effort"] = self.reasoning_effort
+        try:
+            from app.chat.connections import get_creds, provider_for_model
+
+            pid = provider_for_model(self.model)
+            if pid:
+                creds = get_creds(pid)
+                if creds.get("api_key"):
+                    kwargs["api_key"] = creds["api_key"]
+                if creds.get("base_url"):
+                    kwargs["base_url"] = creds["base_url"]
+        except Exception:
+            logger.debug("Connection lookup failed; using env defaults")
         kwargs.update(extra)
         return kwargs
 
@@ -323,11 +339,11 @@ class MemoryManager:
         prompt += "\n".join(f"{m.get('role')}: {m.get('content')}" for m in recent_messages)
 
         try:
-            resp = await acompletion(
+            resp = await acompletion(**self._completion_kwargs(
                 model=self.memory_model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-            )
+            ))
             raw = resp.choices[0].message.content
 
             # Robust JSON extraction

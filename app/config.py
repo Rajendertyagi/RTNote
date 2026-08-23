@@ -20,6 +20,8 @@ CHAT_DATABASE_URL = os.getenv(
     "CHAT_DATABASE_URL",
     f"sqlite+aiosqlite:///{(DATA_DIR / 'chat.db').as_posix()}",
 )
+# Provider API keys / base URLs (never committed — data/ is gitignored).
+CONNECTIONS_PATH = Path(os.getenv("CONNECTIONS_PATH", str(DATA_DIR / "connections.json")))
 
 HOST = "0.0.0.0"
 PORT = 8000

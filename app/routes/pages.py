@@ -17,3 +17,9 @@ async def index():
 async def chat_page():
     html_path = TEMPLATES_DIR / "chat.html"
     return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+
+
+@router.get("/connections", response_class=HTMLResponse)
+async def connections_page():
+    html_path = TEMPLATES_DIR / "connections.html"
+    return HTMLResponse(content=html_path.read_text(encoding="utf-8"))

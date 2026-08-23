@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connections — RTW</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/chat.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css">
+</head>
+<body>
+    <div class="conn-app">
+        <header class="conn-header">
+            <h2><i class='bx bx-plug'></i> AI Connections</h2>
+            <div class="conn-header__actions">
+                <a class="btn-sm" href="/chat"><i class='bx bx-message-square'></i> Back to chat</a>
+                <a class="btn-sm" href="/"><i class='bx bx-note'></i> Notes</a>
+            </div>
+        </header>
+        <p class="conn-sub">Keys are stored locally in <code>data/connections.json</code> and never leave this machine except to call the provider. Env vars are used as fallback.</p>
+        <div class="conn-grid" id="providerGrid"></div>
+    </div>
+
+    <template id="providerCardTpl">
+        <div class="conn-card">
+            <div class="conn-card__head">
+                <span class="conn-card__name"></span>
+                <span class="conn-status" title="Configured status"></span>
+            </div>
+            <label>API key</label>
+            <input type="password" class="conn-key" placeholder="sk-…" autocomplete="off"
+                   spellcheck="false">
+            <label>Base URL <span class="opt">(optional)</span></label>
+            <input type="text" class="conn-url" placeholder="https://…" spellcheck="false">
+            <div class="conn-card__actions">
+                <button class="btn-sm conn-save">Save</button>
+                <button class="btn-sm conn-test">Test</button>
+                <button class="btn-sm danger conn-del">Delete</button>
+                <span class="conn-result"></span>
+            </div>
+        </div>
+    </template>
+
+    <script src="/static/js/connections.js?v=1"></script>
+</body>
+</html>
