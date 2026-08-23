@@ -4,7 +4,17 @@ import { expect, test } from "@playwright/test";
  * Chat E2E — full page (/chat) and mini panel (index).
  * The server runs with CHAT_FAKE_LLM=canned (see playwright.config.ts),
  * so the "assistant" streams a deterministic canned reply with markdown.
+ *
+ * The E2E server DB persists across tests (workers=1), so every test
+ * starts from a clean slate: wipe chat sessions via the API first.
  */
+
+test.beforeEach(async ({ request }) => {
+  const sessions = await (await request.get("/api/chat/sessions")).json();
+  for (const s of sessions as Array<{ id: number }>) {
+    await request.delete(`/api/chat/sessions/${s.id}`);
+  }
+});
 
 test.describe("Full chat", () => {
   test("send message → streamed markdown reply → session appears", async ({ page }) => {
@@ -96,8 +106,12 @@ test.describe("Markdown security", () => {
     await expect(bubble.locator("script")).toHaveCount(0);
     await expect(bubble.locator("[onclick]")).toHaveCount(0);
     await expect(bubble.locator("img[onerror]")).toHaveCount(0);
-    const href = await bubble.locator("a").first().getAttribute("href");
-    expect(href === null || !href.toLowerCase().startsWith("javascript:")).toBe(true);
+    const anchors = bubble.locator("a");
+    const anchorCount = await anchors.count();
+    for (let i = 0; i < anchorCount; i++) {
+      const href = await anchors.nth(i).getAttribute("href");
+      expect(href === null || !href.toLowerCase().startsWith("javascript:")).toBe(true);
+    }
 
     // normal markdown still renders
     await expect(bubble.locator("strong").first()).toHaveText("bold stays");
@@ -141,7 +155,7 @@ test.describe("Error handling & stop", () => {
     const gate = new Promise<void>((resolve) => { release = resolve; });
     await page.route("**/api/chat/stream", async (route) => {
       await gate; // hold the response until the test releases it
-      await route.abort("timedout");
+      await route.abort("timedout").catch(() => {}); // request may already be aborted
     });
 
     await page.goto("/chat");
