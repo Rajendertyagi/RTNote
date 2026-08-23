@@ -29,6 +29,8 @@ export default defineConfig({
       NOTES_DB_PATH: path.join(e2eDir, "notes.db"),
       CHAT_DATABASE_URL:
         "sqlite+aiosqlite:///" + path.join(e2eDir, "chat.db").replace(/\\/g, "/"),
+      // Deterministic LLM responder for the chat specs (see app/chat/memory.py).
+      CHAT_FAKE_LLM: "canned",
     },
   },
 });

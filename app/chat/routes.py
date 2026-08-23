@@ -12,9 +12,12 @@ from typing import Optional, List
 
 from app.chat.db import AsyncSessionLocal  # your async session factory
 from app.chat.memory import MemoryManager, ChatSession, Memory, ChatStreamError
+from app.core.logging import get_logger
 from pydantic import BaseModel, Field
 
 import json
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -83,6 +86,7 @@ async def send_message(
     )
     await manager.load_session()
     await manager.add_user_message(request.message)
+    logger.info("chat request transport=send model=%s session=%s", request.model, request.session_id)
     # Persist the user message before generating so it survives failures.
     session_id = await manager.ensure_session()
     if not session_id:
@@ -116,6 +120,7 @@ async def stream_message(request: SendMessageRequest, db: AsyncSession = Depends
     )
     await manager.load_session()
     await manager.add_user_message(request.message)
+    logger.info("chat request transport=stream model=%s session=%s", request.model, request.session_id)
     session_id = await manager.ensure_session()
     if not session_id:
         raise HTTPException(status_code=500, detail="Failed to create or persist chat session")

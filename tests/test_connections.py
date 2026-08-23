@@ -134,6 +134,16 @@ async def test_ollama_uses_base_url_not_key(client, monkeypatch):
     assert "api_key" not in calls
 
 
+async def test_put_empty_string_clears_saved_key(client, connections_store):
+    await client.put("/api/connections/openai", json={"api_key": "sk-clear-me-123", "base_url": "http://x"})
+    body = (await client.put("/api/connections/openai", json={"api_key": ""})).json()
+    assert body["api_key_masked"] is None
+    listed = (await client.get("/api/connections")).json()
+    oa = next(p for p in listed if p["id"] == "openai")
+    assert oa["api_key_masked"] is None
+    assert oa["base_url"] == "http://x"  # untouched field preserved
+
+
 # ---------- Integration with chat ----------
 async def test_models_endpoint_flags_configured(client, monkeypatch):
     models = (await client.get("/api/chat/models")).json()

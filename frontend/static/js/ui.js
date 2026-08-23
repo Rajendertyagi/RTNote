@@ -706,149 +706,80 @@ function initFiles() {
     }
 }
 
-/* ── Chat panel ── */
-let chatSessionId = null;
-let isGenerating = false;
-let chatAttachmentsMini = []; // {filename, content}
-const CHAT_TEXT_EXT = /\.(txt|md|markdown|csv|json|py|js|ts|html|css|xml|yml|yaml|log|sql|sh|toml|ini)$/i;
+/* ── Mini chat panel (thin adapter over ChatCore) ──
+   Transport: blocking POST /api/chat/send (intentional difference from the
+   full page's SSE stream). All shared behavior lives in chat-core.js. */
+const miniChat = ChatCore.createChatState();
 
 function initChatMiniToolbar() {
     const modelSel = document.getElementById('chatModelMini');
-    const effortSel = document.getElementById('chatEffortMini');
     if (!modelSel) return;
 
-    fetch('/api/chat/models').then((r) => r.json()).then((models) => {
-        models.forEach((m) => {
-            const o = document.createElement('option');
-            o.value = m.id;
-            o.textContent = m.name;
-            modelSel.appendChild(o);
-        });
-        const saved = localStorage.getItem('chatModel');
-        if (saved && [...modelSel.options].some((o) => o.value === saved)) modelSel.value = saved;
-    }).catch(() => {});
+    ChatCore.loadModels().then((models) => {
+        miniChat.models = models;
+        ChatCore.populateModelSelect(modelSel, models);
+    });
 
-    modelSel.addEventListener('change', () => localStorage.setItem('chatModel', modelSel.value));
-    effortSel.addEventListener('change', () => localStorage.setItem('chatEffort', effortSel.value));
-    const savedEffort = localStorage.getItem('chatEffort');
-    if (savedEffort) effortSel.value = savedEffort;
+    const effortSel = document.getElementById('chatEffortMini');
+    if (effortSel) {
+        const saved = localStorage.getItem(ChatCore.LS.effort);
+        if (saved && [...effortSel.options].some((o) => o.value === saved)) effortSel.value = saved;
+        effortSel.addEventListener('change', () => localStorage.setItem(ChatCore.LS.effort, effortSel.value));
+    }
 
     document.getElementById('chatAttachMini').addEventListener('click',
         () => document.getElementById('chatFileMini').click());
     document.getElementById('chatFileMini').addEventListener('change', async (e) => {
-        for (const f of e.target.files) {
-            if (!CHAT_TEXT_EXT.test(f.name)) continue;
-            chatAttachmentsMini.push({ filename: f.name, content: (await f.text()).slice(0, 200000) });
-        }
+        await ChatCore.addFiles(miniChat, [...e.target.files]);
+        ChatCore.renderAttachmentChips(document.getElementById('chatAttChipsMini'), miniChat);
         e.target.value = '';
-        renderChatAttChips();
     });
 }
 
-function renderChatAttChips() {
-    const bar = document.getElementById('chatAttChipsMini');
-    if (!bar) return;
-    bar.innerHTML = '';
-    bar.classList.toggle('hidden', !chatAttachmentsMini.length);
-    chatAttachmentsMini.forEach((a) => {
-        const chip = document.createElement('span');
-        chip.className = 'att-chip';
-        chip.innerHTML = escapeHtml(a.filename) + ' <button title="Remove"><i class="bx bx-x"></i></button>';
-        chip.querySelector('button').onclick = () => {
-            chatAttachmentsMini = chatAttachmentsMini.filter((v) => v !== a);
-            renderChatAttChips();
-        };
-        bar.appendChild(chip);
-    });
-}
-
-function sendMessage() {
-    if (isGenerating) return;
+async function sendMessage() {
+    if (miniChat.generating) return;
     const input = document.getElementById('chat-input');
-    const message = input.value.trim();
-    if (!message) return;
+    const container = document.getElementById('chat-messages');
+    const message = input ? input.value.trim() : '';
+    if (!message || !container) return;
 
-    appendMessage('user', message + (chatAttachmentsMini.length
-        ? ' <i class="bx bx-paperclip" title="' + chatAttachmentsMini.map((a) => a.filename).join(', ') + '"></i>' : ''));
+    ChatCore.appendMessage(container, 'user', message, { noCopy: true });
     input.value = '';
-    isGenerating = true;
-    const typingId = appendTypingIndicator();
+    ChatCore.clearAttachments(miniChat, document.getElementById('chatAttChipsMini'));
 
-    const payload = {
-        message,
-        session_id: chatSessionId,
-        model: document.getElementById('chatModelMini')
-            ? document.getElementById('chatModelMini').value : 'gpt-4o-mini',
-        system_prompt: 'You are a helpful assistant for a note-taking app.',
-        attachments: chatAttachmentsMini,
-    };
-    const effort = document.getElementById('chatEffortMini')
-        ? document.getElementById('chatEffortMini').value : '';
-    if (effort) payload.reasoning_effort = effort;
-
-    fetch('/api/chat/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    })
-        .then((r) => r.json())
-        .then((data) => {
-            removeTypingIndicator(typingId);
-            chatSessionId = data.session_id;
-            appendMessage('assistant', data.reply, true);
-            chatAttachmentsMini = [];
-            renderChatAttChips();
-        })
-        .catch((err) => {
-            removeTypingIndicator(typingId);
-            appendMessage('assistant', 'Error: ' + err.message);
-        })
-        .finally(() => { isGenerating = false; });
-}
-
-function appendMessage(role, text, withCopy) {
-    const container = document.getElementById('chat-messages');
-    if (!container) return;
-    const div = document.createElement('div');
-    div.className = 'message ' + role;
-    div.innerHTML =
-        '<div class="message-avatar">' + (role === 'user' ? '<i class="bx bx-user"></i>' : '<i class="bx bx-bot"></i>') + '</div>' +
-        '<div class="message-content">' + escapeHtml(text) +
-        (withCopy ? ' <button class="chat-copy-btn" title="Copy"><i class="bx bx-copy"></i></button>' : '') +
-        '</div>';
-    if (withCopy) {
-        div.querySelector('.chat-copy-btn').onclick = function () {
-            navigator.clipboard.writeText(div.querySelector('.message-content').textContent);
-        };
+    const bubble = ChatCore.appendMessage(container, 'assistant', '', { typing: true, noCopy: true });
+    miniChat.generating = true;
+    try {
+        const modelSel = document.getElementById('chatModelMini');
+        const effortSel = document.getElementById('chatEffortMini');
+        const data = await ChatCore.send(ChatCore.buildPayload(miniChat, message, {
+            modelId: modelSel ? modelSel.value : 'gpt-4o-mini',
+            effort: effortSel && effortSel.value ? effortSel.value : null,
+            systemPrompt: ChatCore.MINI_SYSTEM_PROMPT,
+        }));
+        miniChat.sessionId = data.session_id;
+        if (data.error) {
+            bubble.closest('.msg').classList.add('msg-error');
+            ChatCore.setBubbleContent(bubble, '⚠ ' + data.error, 'assistant');
+        } else {
+            ChatCore.setBubbleContent(bubble, data.reply || '(empty response)', 'assistant');
+            ChatCore.addCopyButton(bubble);
+        }
+    } catch (err) {
+        bubble.closest('.msg').classList.add('msg-error');
+        ChatCore.setBubbleContent(bubble, '⚠ Connection lost: ' + err.message, 'assistant');
+    } finally {
+        bubble.classList.remove('typing');
+        miniChat.generating = false;
+        ChatCore.scrollToBottom(container);
     }
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
-}
-
-function appendTypingIndicator() {
-    const container = document.getElementById('chat-messages');
-    if (!container) return '';
-    const div = document.createElement('div');
-    div.className = 'message assistant typing';
-    const id = 'typing-' + Date.now();
-    div.id = id;
-    div.innerHTML = '<div class="message-avatar"><i class="bx bx-bot"></i></div><div class="message-content"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
-    return id;
-}
-
-function removeTypingIndicator(id) {
-    const el = document.getElementById(id);
-    if (el) el.remove();
 }
 
 async function loadMemories() {
     const container = document.getElementById('memories-list');
     if (!container) return;
     try {
-        const resp = await fetch('/api/chat/memories');
-        const data = await resp.json();
+        const data = await ChatCore.listMemories();
         if (!data.memories || data.memories.length === 0) {
             container.innerHTML = '<div class="empty-state-small">No memories yet. Chat with the AI to extract memories.</div>';
         } else {

@@ -130,6 +130,52 @@
 .typing::after { content: "▍"; animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 
+/* ── Error bubbles (never silent, never persisted as content) ── */
+.msg.msg-error .bubble {
+    background: rgba(243, 139, 168, .12);
+    border: 1px solid var(--red, #f38ba8);
+    color: var(--red, #f38ba8);
+}
+
+/* ── Markdown-rendered assistant bubbles ──
+   `.md` switches off pre-wrap (markdown makes its own block layout). */
+.msg .bubble.md { white-space: normal; }
+.msg .bubble.md > :first-child { margin-top: 0; }
+.msg .bubble.md > :last-child { margin-bottom: 0; }
+.msg .bubble.md p { margin: .45em 0; }
+.msg .bubble.md ul, .msg .bubble.md ol { margin: .45em 0; padding-left: 1.4em; }
+.msg .bubble.md h1, .msg .bubble.md h2, .msg .bubble.md h3,
+.msg .bubble.md h4 { margin: .7em 0 .35em; line-height: 1.3; }
+.msg .bubble.md h1 { font-size: 1.25em; }
+.msg .bubble.md h2 { font-size: 1.15em; }
+.msg .bubble.md h3 { font-size: 1.05em; }
+.msg .bubble.md code {
+    background: var(--bg, rgba(0,0,0,.25));
+    border: 1px solid var(--border, #444);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: .88em;
+}
+.msg .bubble.md pre {
+    background: var(--bg, rgba(0,0,0,.3));
+    border: 1px solid var(--border, #444);
+    border-radius: 8px;
+    padding: 10px 12px;
+    overflow-x: auto;
+    margin: .55em 0;
+}
+.msg .bubble.md pre code {
+    background: none; border: none; padding: 0; font-size: .85em;
+}
+.msg .bubble.md blockquote {
+    margin: .5em 0; padding: .15em .9em;
+    border-left: 3px solid var(--border, #444); opacity: .85;
+}
+.msg .bubble.md a { color: var(--accent, #89b4fa); }
+.msg .bubble.md table { border-collapse: collapse; margin: .55em 0; font-size: .9em; display: block; overflow-x: auto; }
+.msg .bubble.md th, .msg .bubble.md td { border: 1px solid var(--border, #444); padding: 4px 8px; }
+
 .attachments-bar {
     display: flex; gap: 6px; flex-wrap: wrap;
     padding: 6px 16px 0; max-width: 820px; margin: 0 auto; width: 100%;
@@ -160,7 +206,30 @@
     border-radius: 8px; width: 36px; height: 36px; cursor: pointer; font-size: 17px;
 }
 .btn-icon:hover { background: var(--hover, rgba(128,128,128,.15)); }
+.btn-icon:focus-visible, .composer textarea:focus-visible,
+.chat-toolbar select:focus-visible, .chat-custom-model:focus-visible {
+    outline: 2px solid var(--accent, #89b4fa);
+    outline-offset: 1px;
+}
 .btn-icon.send { background: var(--accent-dim, rgba(137,180,250,.25)); }
+.btn-icon.send:disabled { opacity: .45; cursor: not-allowed; }
+.btn-icon.send:disabled:hover { background: var(--accent-dim, rgba(137,180,250,.25)); }
+
+/* ── Mini panel (index page) reuses the same canonical markup at a
+   smaller scale — one chat system, two surfaces. ── */
+.chat-messages .msg { gap: 7px; }
+.chat-messages .msg .avatar { width: 22px; height: 22px; font-size: 12px; }
+.chat-messages .msg .bubble { max-width: 86%; padding: 6px 10px; font-size: 12px; border-radius: 10px; }
+.chat-messages .msg .bubble .copy-btn { top: -10px; font-size: 11px; }
+
+/* ── Narrow windows ── */
+@media (max-width: 720px) {
+    .chat-sessions { width: 170px; min-width: 170px; }
+    .chat-toolbar { gap: 10px; }
+    .chat-custom-model { width: 140px; }
+    .msg .bubble { max-width: 92%; }
+    .conn-grid { grid-template-columns: 1fr; }
+}
 
 /* ── Modal ── */
 .modal-overlay {

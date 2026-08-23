@@ -36,8 +36,9 @@
          so basicSetup is composed from the scoped packages instead. -->
 
     <!-- App styles -->
-    <link rel="stylesheet" href="/static/css/style.css?v=17">
-    <link rel="stylesheet" href="/static/css/themes.css?v=17">
+    <link rel="stylesheet" href="/static/css/style.css?v=18">
+    <link rel="stylesheet" href="/static/css/themes.css?v=18">
+    <link rel="stylesheet" href="/static/css/chat.css?v=2">
 </head>
 <body>
     <div class="app">
@@ -191,28 +192,28 @@
             </div>
             <div class="chat-container" id="chat-panel">
                 <div class="chat-mini-toolbar">
-                    <select id="chatModelMini" title="Model"></select>
+                    <select id="chatModelMini" title="Model" data-testid="mini-model-select"></select>
                     <select id="chatEffortMini" title="Thinking level">
                         <option value="">Thinking: off</option>
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
                     </select>
-                    <button class="qs-action" id="chatAttachMini" title="Attach text file"><i class='bx bx-paperclip'></i></button>
+                    <button class="qs-action" id="chatAttachMini" title="Attach text file" aria-label="Attach text file"><i class='bx bx-paperclip'></i></button>
                     <input type="file" id="chatFileMini" multiple hidden
                            accept=".txt,.md,.markdown,.csv,.json,.py,.js,.ts,.html,.css,.xml,.yml,.yaml,.log,.sql,.sh,.toml,.ini">
-                    <a href="/chat" target="_blank" class="qs-action" title="Open full chat"><i class='bx bx-expand-alt'></i></a>
+                    <a href="/chat" target="_blank" class="qs-action" title="Open full chat" aria-label="Open full chat"><i class='bx bx-expand-alt'></i></a>
                 </div>
                 <div id="chatAttChipsMini" class="chat-att-chips hidden"></div>
-                <div class="chat-messages" id="chat-messages">
-                    <div class="message assistant">
-                        <div class="message-avatar"><i class='bx bx-bot'></i></div>
-                        <div class="message-content">Hi! I can help with your notes. Try switching themes top-right.</div>
+                <div class="chat-messages" id="chat-messages" data-testid="mini-chat-stream">
+                    <div class="msg assistant">
+                        <div class="avatar"><i class='bx bx-bot'></i></div>
+                        <div class="bubble">Hi! I can help with your notes. Try switching themes top-right.</div>
                     </div>
                 </div>
                 <div class="chat-input">
-                    <input type="text" id="chat-input" placeholder="Ask about your notes..." onkeypress="if(event.key==='Enter')sendMessage()">
-                    <button onclick="sendMessage()"><i class='bx bx-send'></i></button>
+                    <input type="text" id="chat-input" data-testid="mini-composer" placeholder="Ask about your notes..." onkeypress="if(event.key==='Enter')sendMessage()">
+                    <button onclick="sendMessage()" aria-label="Send" data-testid="mini-send-btn"><i class='bx bx-send'></i></button>
                 </div>
             </div>
             <div class="right-content hidden" id="outline-panel"><div class="empty-state-small">No outline yet — add headings</div></div>
@@ -246,13 +247,17 @@
     </div>
     <div class="toast-container" id="toastContainer"></div>
 
-    <!-- App modules (order matters: api â†’ ui â†’ tree â†’ editor â†’ search â†’ main) -->
-    <script src="/static/js/api.js?v=17"></script>
-    <script src="/static/js/ui.js?v=17"></script>
-    <script src="/static/js/tree.js?v=17"></script>
-    <script src="/static/js/editor.js?v=17"></script>
-    <script src="/static/js/search.js?v=17"></script>
-    <script src="/static/js/main.js?v=17"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <!-- App modules (order matters: logger → api → ui → tree → editor → search → main) -->
+    <script src="/static/js/logger.js?v=1"></script>
+    <script src="/static/js/chat-core.js?v=2"></script>
+    <script src="/static/js/api.js?v=18"></script>
+    <script src="/static/js/ui.js?v=18"></script>
+    <script src="/static/js/tree.js?v=18"></script>
+    <script src="/static/js/editor.js?v=18"></script>
+    <script src="/static/js/search.js?v=18"></script>
+    <script src="/static/js/main.js?v=18"></script>
 </body>
 </html>
 

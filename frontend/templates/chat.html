@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/chat.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 </head>
 <body>
     <div class="chat-app">
@@ -16,7 +18,7 @@
                 <span>Sessions</span>
                 <button class="btn-sm" id="newChatBtn" title="New chat"><i class='bx bx-plus'></i> New</button>
             </div>
-            <div class="chat-sessions__list" id="sessionList"></div>
+            <div class="chat-sessions__list" id="sessionList" data-testid="session-list"></div>
             <div class="chat-sessions__footer">
                 <a href="/" class="btn-sm"><i class='bx bx-left-arrow-alt'></i> Back to notes</a>
             </div>
@@ -27,7 +29,7 @@
             <header class="chat-toolbar">
                 <div class="chat-toolbar__group">
                     <label for="modelSelect">Model</label>
-                    <select id="modelSelect"></select>
+                    <select id="modelSelect" data-testid="model-select"></select>
                     <input type="text" id="customModel" placeholder="or custom: ollama/llama3"
                            class="chat-custom-model" spellcheck="false">
                 </div>
@@ -49,21 +51,21 @@
                 <p class="hint">Saved automatically per browser.</p>
             </div>
 
-            <div class="chat-stream" id="chatStream"></div>
+            <div class="chat-stream" id="chatStream" data-testid="chat-stream"></div>
 
-            <div class="attachments-bar hidden" id="attachmentsBar"></div>
+            <div class="attachments-bar hidden" id="attachmentsBar" data-testid="attachments-bar"></div>
 
             <footer class="composer">
                 <div class="composer__actions">
-                    <button class="btn-icon" id="attachFileBtn" title="Attach text files"><i class='bx bx-paperclip'></i></button>
+                    <button class="btn-icon" id="attachFileBtn" title="Attach text files" aria-label="Attach text files"><i class='bx bx-paperclip'></i></button>
                     <input type="file" id="chatFileInput" multiple hidden
                            accept=".txt,.md,.markdown,.csv,.json,.py,.js,.ts,.html,.css,.xml,.yml,.yaml,.log,.sql,.sh,.toml,.ini">
-                    <button class="btn-icon" id="attachNoteBtn" title="Attach from note attachments"><i class='bx bx-file'></i></button>
-                    <button class="btn-icon" id="stopBtn" title="Stop generating" hidden><i class='bx bx-stop-circle'></i></button>
+                    <button class="btn-icon" id="attachNoteBtn" title="Attach from note attachments" aria-label="Attach from note attachments"><i class='bx bx-file'></i></button>
+                    <button class="btn-icon" id="stopBtn" title="Stop generating" aria-label="Stop generating" data-testid="stop-btn" hidden><i class='bx bx-stop-circle'></i></button>
                 </div>
-                <textarea id="chatComposer" rows="1"
+                <textarea id="chatComposer" rows="1" data-testid="composer"
                           placeholder="Message the assistant…  (Enter to send, Shift+Enter for newline)"></textarea>
-                <button class="btn-icon send" id="sendBtn" title="Send"><i class='bx bxs-send'></i></button>
+                <button class="btn-icon send" id="sendBtn" title="Send" aria-label="Send" data-testid="send-btn"><i class='bx bxs-send'></i></button>
             </footer>
         </main>
     </div>
@@ -83,6 +85,7 @@
         </div>
     </div>
 
-    <script src="/static/js/chat.js?v=1"></script>
+    <script src="/static/js/chat-core.js?v=2"></script>
+    <script src="/static/js/chat.js?v=2"></script>
 </body>
 </html>

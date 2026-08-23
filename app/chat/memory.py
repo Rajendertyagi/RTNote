@@ -7,7 +7,7 @@ Uses SQLite FTS5 for memory retrieval (configured via Alembic migration).
 
 import asyncio
 import json
-import logging
+import os
 import re
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
@@ -21,9 +21,9 @@ from litellm import acompletion
 # Shared DB objects
 from app.chat.db import Base, AsyncSessionLocal
 from app.config import CHAT_HISTORY_LIMIT
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+logger = get_logger(__name__)
 
 
 class ChatStreamError(Exception):
@@ -41,6 +41,66 @@ def friendly_error(exc: Exception) -> str:
     if "timeout" in low or "timed out" in low:
         return "The model took too long to respond."
     return f"Model request failed: {s[:200]}"
+
+
+# ---------- E2E test hook ----------
+# CHAT_FAKE_LLM=canned installs a deterministic responder so Playwright can
+# exercise the full chat flow with zero network. Never set in production.
+# - a user message containing "security-test" gets a hostile-markdown reply
+#   (sanitization coverage in tests/e2e/chat.spec.ts)
+# - any model id containing "fail" raises, for error-path coverage
+if os.getenv("CHAT_FAKE_LLM") == "canned":
+    _DEFAULT_REPLY = "Hello from the **fake** model!\n\n```python\nprint('hi')\n```"
+    _HOSTILE_REPLY = (
+        "Security probe **bold stays**\n\n"
+        "<script>alert(1)</script>\n\n"
+        "<img src=x onerror=\"alert(2)\">\n\n"
+        "[click me](javascript:alert(3))\n\n"
+        "<svg><script>alert(4)</script></svg>\n\n"
+        "<div onclick=\"alert(5)\">styled text</div>"
+    )
+
+    def _canned_reply(kwargs) -> str:
+        for m in kwargs.get("messages", []):
+            if m.get("role") == "user" and "security-test" in str(m.get("content", "")):
+                return _HOSTILE_REPLY
+        return _DEFAULT_REPLY
+
+    class _FakeMsg:
+        def __init__(self, content):
+            self.content = content
+
+    class _FakeChoice:
+        def __init__(self, content):
+            self.message = _FakeMsg(content)
+
+    class _FakeResp:
+        def __init__(self, content):
+            self.choices = [_FakeChoice(content)]
+
+    class _FakeStreamChunk:
+        def __init__(self, text):
+            self.choices = [type("C", (), {"delta": type("D", (), {"content": text})()})()]
+
+    class _FakeStream:
+        def __init__(self, text):
+            step = 7
+            self._parts = [text[i:i + step] for i in range(0, len(text), step)]
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            if not self._parts:
+                raise StopAsyncIteration
+            return _FakeStreamChunk(self._parts.pop(0))
+
+    async def acompletion(**kwargs):  # noqa: F811 - deliberate test shadow
+        if "fail" in str(kwargs.get("model", "")):
+            raise RuntimeError("simulated provider failure (CHAT_FAKE_LLM)")
+        if kwargs.get("stream"):
+            return _FakeStream(_canned_reply(kwargs))
+        return _FakeResp(_canned_reply(kwargs))
 
 
 # ---------- Models ----------
@@ -238,6 +298,8 @@ class MemoryManager:
 
         # 2. Call LLM (async, with timeout). Failures raise ChatStreamError
         # so the caller can surface a structured error — nothing is persisted.
+        logger.info("chat completion started model=%s session=%s msgs=%d",
+                    self.model, self.session_id, len(self._llm_messages()))
         try:
             response = await asyncio.wait_for(
                 acompletion(**self._completion_kwargs()),
@@ -245,10 +307,10 @@ class MemoryManager:
             )
             assistant_reply = response.choices[0].message.content or ""
         except asyncio.TimeoutError:
-            logger.exception("LLM call timed out")
+            logger.exception("LLM call timed out model=%s session=%s", self.model, self.session_id)
             raise ChatStreamError("The model took too long to respond.")
         except Exception as exc:
-            logger.exception("LLM call failed")
+            logger.exception("LLM call failed model=%s session=%s", self.model, self.session_id)
             raise ChatStreamError(friendly_error(exc)) from exc
 
         # 3. Append assistant reply and save session
@@ -314,6 +376,7 @@ class MemoryManager:
         """
         parts: List[str] = []
         persisted = False
+        logger.info("stream started model=%s session=%s", self.model, self.session_id)
         try:
             await self._augment_with_memories()
             response = await asyncio.wait_for(
@@ -333,23 +396,27 @@ class MemoryManager:
             self.messages.append({"role": "assistant", "content": reply})
             await self._save()
             persisted = True
+            logger.info("stream completed session=%s chars=%d", self.session_id, len(reply))
             if self.auto_extract:
                 recent = self.messages[-8:]
                 asyncio.create_task(self._extract_memories_background(recent))
         except asyncio.TimeoutError:
-            logger.exception("LLM stream timed out")
+            logger.exception("LLM stream timed out model=%s session=%s", self.model, self.session_id)
             raise ChatStreamError("The model took too long to respond.")
         except Exception as exc:
-            logger.exception("LLM stream failed")
+            logger.exception("LLM stream failed model=%s session=%s", self.model, self.session_id)
             raise ChatStreamError(friendly_error(exc)) from exc
         finally:
             if not persisted and parts:
                 # Client disconnected or upstream failed mid-stream: keep
                 # whatever reached the user instead of losing it.
-                self.messages.append({"role": "assistant", "content": "".join(parts)})
+                partial = "".join(parts)
+                self.messages.append({"role": "assistant", "content": partial})
                 task = asyncio.ensure_future(self._save())
                 try:
                     await asyncio.shield(task)
+                    logger.info("stream cancelled; persisted partial session=%s chars=%d",
+                                self.session_id, len(partial))
                 except asyncio.CancelledError:
                     pass  # shield raised; the save continues in the background
                 except Exception:
@@ -380,8 +447,9 @@ class MemoryManager:
         """
         model = self._resolve_memory_model()
         if not model:
-            logger.debug("Memory extraction skipped: provider not configured")
+            logger.debug("memory extraction skipped session=%s (provider unconfigured)", self.session_id)
             return
+        logger.info("memory extraction started model=%s", model)
         try:
             async with AsyncSessionLocal() as db:
                 extractor = MemoryManager(db=db, user_id=self.user_id, memory_model=model)
@@ -389,6 +457,7 @@ class MemoryManager:
                     extractor._extract_memories(recent_messages),
                     timeout=self.extraction_timeout,
                 )
+            logger.info("memory extraction completed model=%s", model)
         except asyncio.TimeoutError:
             logger.exception("Memory extraction timed out")
         except Exception:
