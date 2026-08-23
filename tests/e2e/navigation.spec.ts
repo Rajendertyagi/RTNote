@@ -54,7 +54,12 @@ test.describe("Navigation history", () => {
     await expect(page.locator("#topbar-title")).toContainText(`Bravo ${u}`);
     await page.keyboard.press("Alt+ArrowLeft"); // Bravo → Alpha
     await expect(page.locator("#topbar-title")).toContainText(`Alpha ${u}`);
-    await expect(page.getByTestId("nav-back")).toBeDisabled();
+
+    const diag = await page.evaluate(() => NavHistory.debug());
+    await expect(
+      page.getByTestId("nav-back"),
+      `history after two backs: ${JSON.stringify(diag)}`
+    ).toBeDisabled();
 
     await page.keyboard.press("Alt+ArrowRight"); // Alpha → Bravo
     await expect(page.locator("#topbar-title")).toContainText(`Bravo ${u}`);
@@ -66,9 +71,11 @@ test.describe("Navigation history", () => {
 
   test("back skips a deleted note and lands on the nearest live one", async ({ page, request }) => {
     const u = uniq();
+    // FLAT siblings: soft-deleting a note trashes its whole subtree, so a
+    // chain would trash C too. Flat notes isolate the skip behavior.
     const a = await (await request.post("/api/notes", { data: { title: `SkipA ${u}` } })).json();
-    const b = await (await request.post("/api/notes", { data: { title: `SkipB ${u}`, parent_id: a.id } })).json();
-    await request.post("/api/notes", { data: { title: `SkipC ${u}`, parent_id: b.id } });
+    const b = await (await request.post("/api/notes", { data: { title: `SkipB ${u}` } })).json();
+    await request.post("/api/notes", { data: { title: `SkipC ${u}` } });
 
     await page.goto("/");
     await waitForAppBoot(page);
@@ -83,7 +90,6 @@ test.describe("Navigation history", () => {
     await expect(page.locator("#topbar-title")).toContainText(`SkipA ${u}`);
 
     // And forward skips it too, landing on the still-live leaf
-    await page.keyboard.press("Alt+ArrowRight");
     await page.keyboard.press("Alt+ArrowRight");
     await expect(page.locator("#topbar-title")).toContainText(`SkipC ${u}`);
   });
@@ -159,7 +165,17 @@ test.describe("Tree reveal & keyboard", () => {
 
     // Child note: Backspace activates the parent
     await page.locator("#note-tree .wb-row", { hasText: `PJRoot ${u}` }).locator(".wb-expander").click();
+    const diag = await page.evaluate(() => ({
+      rows: Array.from(document.querySelectorAll("#note-tree .wb-row")).map((r) => ({
+        text: r.textContent?.trim(),
+        cls: r.className,
+      })),
+    }));
     await openFromTree(page, `PJChild ${u}`);
+    await expect(
+      page.locator("#topbar-title"),
+      `rows after expander click: ${JSON.stringify(diag)}`
+    ).toContainText(`PJChild ${u}`);
     await page.keyboard.press("Backspace");
     await expect(page.locator("#topbar-title")).toContainText(`PJRoot ${u}`);
   });

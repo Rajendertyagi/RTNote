@@ -81,5 +81,7 @@ const NavHistory = (() => {
     push, peek, step, skip, endNavigate,
     canBack, canForward, recent,
     set onChange(fn) { onChange = fn; },
+    /* Debug/introspection for E2E diagnostics */
+    debug() { return { stack: [...stack], index }; },
   };
 })();
