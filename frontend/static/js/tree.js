@@ -252,29 +252,12 @@ async function initTree() {
     /* GUI-4 keyboard tree movement. Primary binding: document capture phase
        (runs before Wunderbaum's own arrow-key handling). Backup: container
        bubble phase. moveNoteFlow's reentrancy lock dedupes double-fires.
-       Focus-guarded so typing in the editor can never mutate hierarchy. */
-    const handleTreeMoveKeydown = (e) => {
-        if (!(e.ctrlKey && !e.shiftKey && !e.altKey)) return;
-        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
-        const ae = document.activeElement;
-        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
-        const treeEl = document.getElementById('note-tree');
-        const inTree = treeEl && (treeEl.contains(ae) || ae === treeEl);
-        const t = mar10.Wunderbaum.getTree('note-tree');
-        const node = t && typeof t.getActiveNode === 'function' ? t.getActiveNode() : null;
-        if (!inTree && !node) return; // neither focus nor a working selection
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        if (!node) return;
-        const id = Number(node.key);
-        window.__treeMoveLast = { id, key: e.key, at: Date.now() };
-        if (e.key === 'ArrowUp') treeMoveRelative(id, -1);
-        else if (e.key === 'ArrowDown') treeMoveRelative(id, 1);
-        else if (e.key === 'ArrowLeft') treePromote(id);
-        else if (e.key === 'ArrowRight') treeNestIntoPrevSibling(id);
-    };
-    document.addEventListener('keydown', handleTreeMoveKeydown, true);
-    el.addEventListener('keydown', handleTreeMoveKeydown);
+       Focus-guarded so typing in the editor can never mutate hierarchy.
+       Registered ONCE globally (initTree may re-run after a rebuild). */
+    if (!_treeKbdBound) {
+        _treeKbdBound = true;
+        document.addEventListener('keydown', handleTreeMoveKeydown, true);
+    }
 
     new mar10.Wunderbaum({
         id: 'note-tree',
@@ -367,17 +350,55 @@ async function initTree() {
 /* Guard: Wunderbaum's reload() re-fires `activate` for the restored node,
    sometimes carrying an event object — which would race whatever the user
    just opened. Ignore activations while this flag is set. */
+/* GUI-4 keyboard tree movement handler (module scope: survives tree
+   rebuilds; registered once via _treeKbdBound). */
+const handleTreeMoveKeydown = (e) => {
+    if (!(e.ctrlKey && !e.shiftKey && !e.altKey)) return;
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+    const t = mar10.Wunderbaum.getTree('note-tree');
+    const node = t && typeof t.getActiveNode === 'function' ? t.getActiveNode() : null;
+    if (!node) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const id = Number(node.key);
+    window.__treeMoveLast = { id, key: e.key, at: Date.now() };
+    if (e.key === 'ArrowUp') treeMoveRelative(id, -1);
+    else if (e.key === 'ArrowDown') treeMoveRelative(id, 1);
+    else if (e.key === 'ArrowLeft') treePromote(id);
+    else if (e.key === 'ArrowRight') treeNestIntoPrevSibling(id);
+};
+
 let _treeReloadGuard = false;
+let _treeKbdBound = false;
 
 async function refreshTree() {
-    const tree = mar10.Wunderbaum.getTree('note-tree');
+    let tree = mar10.Wunderbaum.getTree('note-tree');
     if (!tree) return;
     try {
         _notesCache = await apiListNotes();
         _treeReloadGuard = true;
-        tree.reload(buildTreeSource(_notesCache));
+        const src = buildTreeSource(_notesCache);
+        let rebuilt = false;
+        try {
+            const p = tree.reload(src);
+            if (p && typeof p.then === 'function') await p;
+            rebuilt = document.querySelector('#note-tree .wb-row') !== null;
+        } catch (err) {
+            console.warn('tree.reload unavailable/failed — rebuilding', err);
+        }
+        if (!rebuilt) {
+            // Fallback: full rebuild through the single init choke point.
+            if (typeof tree.destroy === 'function') tree.destroy();
+            el0().innerHTML = '';
+            await initTree();
+            rebuilt = document.querySelector('#note-tree .wb-row') !== null;
+        }
         setTimeout(() => { _treeReloadGuard = false; }, 250);
     } catch (err) {
         console.error('Tree refresh failed:', err);
     }
 }
+
+function el0() { return document.getElementById('note-tree'); }
