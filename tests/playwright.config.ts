@@ -1,10 +1,13 @@
 import { defineConfig } from "@playwright/test";
+import fs from "fs";
 import path from "path";
 
 // E2E server runs against throwaway DBs via env overrides — never data/*.db.
 // This config lives in tests/; repo root is one level up (for main.py + frontend).
 const root = path.join(__dirname, "..");
 const e2eDir = path.join(__dirname, ".tmp-e2e");
+// SQLite cannot open a DB file whose parent directory doesn't exist.
+fs.mkdirSync(e2eDir, { recursive: true });
 
 export default defineConfig({
   testDir: "./e2e",
