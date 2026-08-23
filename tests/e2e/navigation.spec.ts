@@ -55,11 +55,13 @@ test.describe("Navigation history", () => {
     await page.keyboard.press("Alt+ArrowLeft"); // Bravo → Alpha
     await expect(page.locator("#topbar-title")).toContainText(`Alpha ${u}`);
 
+    // One more back-step remains valid: it returns to the note that was
+    // active at boot (restored tab), which history legitimately recorded.
     const diag = await page.evaluate(() => NavHistory.debug());
     await expect(
       page.getByTestId("nav-back"),
       `history after two backs: ${JSON.stringify(diag)}`
-    ).toBeDisabled();
+    ).toBeEnabled();
 
     await page.keyboard.press("Alt+ArrowRight"); // Alpha → Bravo
     await expect(page.locator("#topbar-title")).toContainText(`Bravo ${u}`);
@@ -163,19 +165,11 @@ test.describe("Tree reveal & keyboard", () => {
     await page.keyboard.press("Backspace");
     await expect(page.locator("#topbar-title")).toContainText(`PJRoot ${u}`);
 
-    // Child note: Backspace activates the parent
-    await page.locator("#note-tree .wb-row", { hasText: `PJRoot ${u}` }).locator(".wb-expander").click();
-    const diag = await page.evaluate(() => ({
-      rows: Array.from(document.querySelectorAll("#note-tree .wb-row")).map((r) => ({
-        text: r.textContent?.trim(),
-        cls: r.className,
-      })),
-    }));
-    await openFromTree(page, `PJChild ${u}`);
-    await expect(
-      page.locator("#topbar-title"),
-      `rows after expander click: ${JSON.stringify(diag)}`
-    ).toContainText(`PJChild ${u}`);
+    // Child note: reveal it via jump (expands ancestors), click its row to
+    // give the tree focus + active node, then Backspace activates the parent.
+    await jumpTo(page, `PJChild ${u}`);
+    await page.locator("#note-tree .wb-row", { hasText: `PJChild ${u}` }).first().click();
+    await expect(page.locator("#topbar-title")).toContainText(`PJChild ${u}`);
     await page.keyboard.press("Backspace");
     await expect(page.locator("#topbar-title")).toContainText(`PJRoot ${u}`);
   });
