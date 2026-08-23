@@ -4,8 +4,9 @@ import { expect, test } from "@playwright/test";
    middle-click close, dirty indicator, close semantics, overflow,
    restoration, and history non-pollution.
    Browser-reserved shortcuts are exercised via synthetic keydown dispatch
-   (same handler path as real keys; untrusted events still hit our listener).
-   Seeds use per-run unique titles: the E2E server DB accumulates rows. */
+   (same handler path as real keys).
+   The E2E server DB accumulates across tests/runs: every test starts by
+   purging all notes so counts and tree rows stay deterministic. */
 
 async function waitForAppBoot(page: import("@playwright/test").Page) {
   await page.waitForFunction(() => typeof App !== "undefined" && App.bootDone === true, undefined, {
@@ -14,6 +15,15 @@ async function waitForAppBoot(page: import("@playwright/test").Page) {
 }
 
 const uniq = () => Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
+
+test.beforeEach(async ({ request }) => {
+  // Fresh workspace: soft-delete everything, then hard-purge the trash.
+  const notes = await (await request.get("/api/notes")).json();
+  for (const n of notes as Array<{ id: number }>) {
+    await request.delete(`/api/notes/${n.id}`).catch(() => {});
+  }
+  await request.post("/api/trash/empty");
+});
 
 async function jumpTo(page: import("@playwright/test").Page, title: string) {
   await page.keyboard.press("Control+k");
@@ -30,7 +40,6 @@ function tab(page: import("@playwright/test").Page, title: string) {
   return page.locator("#tabs .tab", { hasText: title }).first();
 }
 
-/* Dispatch a synthetic keyboard shortcut through the app's own handler */
 function fireShortcut(page: import("@playwright/test").Page, init: KeyboardEventInit) {
   return page.evaluate((i) => {
     document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...i }));
@@ -49,26 +58,18 @@ test.describe("Tabs — keyboard", () => {
     await jumpTo(page, `TabB ${u}`);
     await jumpTo(page, `TabC ${u}`); // active = C = last opened
 
-    // Derive expected neighbors dynamically: persisted tabs from earlier
-    // specs may precede the seeded ones in the tab strip.
     const titles = await page.evaluate(() => TabState.open.map((t: { title: string }) => t.title));
     const cur = titles.findIndex((t: string) => t.includes(`TabC ${u}`));
     const nextAfterC = titles[(cur + 1) % titles.length];
-    const prevOfC = titles[(cur - 1 + titles.length) % titles.length];
 
-    await fireShortcut(page, { key: "Tab", ctrlKey: true }); // C wraps → first
+    await fireShortcut(page, { key: "Tab", ctrlKey: true }); // wraps at the end
     await expect(page.locator("#topbar-title")).toContainText(nextAfterC);
-    await fireShortcut(page, { key: "Tab", ctrlKey: true }); // forward one more
-    const cur2 = await page.evaluate(() => TabState.activeId);
-    const idx2 = await page.evaluate(
-      (i: number) => TabState.open.findIndex((t: { id: number }) => t.id === i),
-      cur2
-    );
+
     await fireShortcut(page, { key: "Tab", ctrlKey: true, shiftKey: true }); // step back
-    await expect(page.locator("#topbar-title")).toContainText(titles[idx2]);
+    await expect(page.locator("#topbar-title")).toContainText(`TabC ${u}`);
   });
 
-  test("Ctrl+W closes the active tab and activates its neighbor", async ({ page, request }) => {
+  test("Ctrl+W closes the active tab and activates its neighbor; Alt+W equivalent", async ({ page, request }) => {
     const u = uniq();
     for (const t of [`CloseA ${u}`, `CloseB ${u}`, `CloseC ${u}`]) {
       await request.post("/api/notes", { data: { title: t } });
@@ -79,13 +80,14 @@ test.describe("Tabs — keyboard", () => {
     await jumpTo(page, `CloseB ${u}`);
     await jumpTo(page, `CloseC ${u}`);
 
+    const before = await page.evaluate(() => TabState.open.length);
+
     await fireShortcut(page, { key: "w", ctrlKey: true }); // close C → neighbor B
-    await expect(page.locator("#tabs .tab")).toHaveCount(2);
+    await expect(page.locator("#tabs .tab")).toHaveCount(before - 1);
     await expect(page.locator("#topbar-title")).toContainText(`CloseB ${u}`);
 
-    // Alt+W is the always-available equivalent
     await page.keyboard.press("Alt+w"); // close B → A
-    await expect(page.locator("#tabs .tab")).toHaveCount(1);
+    await expect(page.locator("#tabs .tab")).toHaveCount(before - 2);
     await expect(page.locator("#topbar-title")).toContainText(`CloseA ${u}`);
   });
 });
@@ -102,8 +104,9 @@ test.describe("Tabs — mouse", () => {
     await jumpTo(page, `MidB ${u}`);
     await jumpTo(page, `MidC ${u}`);
 
+    const before = await page.evaluate(() => TabState.open.length);
     await tab(page, `MidB ${u}`).click({ button: "middle" });
-    await expect(page.locator("#tabs .tab")).toHaveCount(2);
+    await expect(page.locator("#tabs .tab")).toHaveCount(before - 1);
     await expect(page.locator("#topbar-title")).toContainText(`MidC ${u}`); // active unchanged
 
     // Left-click still activates
@@ -178,9 +181,16 @@ test.describe("Tabs — close & restoration", () => {
     }
     await page.goto("/");
     await waitForAppBoot(page);
+    // Wait for the debounced open-tabs persistence BEFORE reloading,
+    // otherwise the restore loses the last opened tab.
+    const putWait = page.waitForResponse(
+      (r) => r.url().includes("/api/options/open-tabs") && r.request().method() === "PUT",
+      { timeout: 15000 }
+    );
     await jumpTo(page, `RestA ${u}`);
     await jumpTo(page, `RestB ${u}`);
     await jumpTo(page, `RestC ${u}`);
+    await putWait;
 
     await page.reload();
     await waitForAppBoot(page);
