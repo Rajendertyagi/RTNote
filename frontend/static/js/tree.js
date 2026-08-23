@@ -167,7 +167,15 @@ function revealNoteInTree(noteId) {
             });
         }
         if (typeof node.reveal === 'function') node.reveal();
-        if (typeof node.setSelected === 'function') node.setSelected(true);
+        // setActive (not just setSelected): keyboard tree movement reads the
+        // ACTIVE node — a merely-selected node is invisible to it. Safe:
+        // programmatic setActive carries no UI event, so the activate
+        // handler ignores it.
+        if (typeof node.setActive === 'function') {
+            try { node.setActive(); } catch (err) { /* fall back below */ }
+        } else if (typeof node.setSelected === 'function') {
+            node.setSelected(true);
+        }
     } catch (e) { /* older builds: best effort */ }
     setTimeout(() => { _treeReloadGuard = false; }, 250);
 }

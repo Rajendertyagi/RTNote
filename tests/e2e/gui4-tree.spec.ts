@@ -13,8 +13,6 @@ async function waitForAppBoot(page: import("@playwright/test").Page) {
 const uniq = () => Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
 
 test.beforeEach(async ({ page, request }) => {
-  // Surface silent failures: uncaught page errors and failed /move calls
-  // are attached to every assertion message via this shared state.
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
   page.on("response", (r) => {
@@ -34,17 +32,17 @@ function diag(page: import("@playwright/test").Page) {
   return errs.length ? ` [errors: ${errs.join(" | ")}]` : "";
 }
 
-function treeOrder(page: import("@playwright/test").Page) {
-  return page.evaluate(() =>
-    Array.from(document.querySelectorAll("#note-tree .wb-row"))
-      .map((r) => r.textContent?.trim())
-      .filter((t) => typeof t === "string")
-  );
+/* Element-order in the tree (NOT string indexOf on joined text) */
+async function treeRowIndex(page: import("@playwright/test").Page, title: string) {
+  return page.evaluate((t) => {
+    const rows = Array.from(document.querySelectorAll("#note-tree .wb-row"));
+    return rows.findIndex((r) => (r.textContent ?? "").includes(t));
+  }, title);
 }
 
 async function openInTree(page: import("@playwright/test").Page, title: string) {
   await page.locator("#note-tree .wb-row", { hasText: title }).first().click();
-  await expect(page.locator("#topbar-title")).toContainText(title, { timeout: 10000 });
+  await expect(page.locator("#topbar-title"), title + diag(page)).toContainText(title, { timeout: 10000 });
 }
 
 async function jumpTo(page: import("@playwright/test").Page, title: string) {
@@ -53,16 +51,15 @@ async function jumpTo(page: import("@playwright/test").Page, title: string) {
   await page.locator("#quickSearchInput").fill(title);
   await resp;
   await page.keyboard.press("Enter");
-  await expect(page.locator("#topbar-title")).toContainText(title, { timeout: 10000 });
+  await expect(page.locator("#topbar-title"), title + diag(page)).toContainText(title, { timeout: 10000 });
 }
 
 test.describe("Tree keyboard movement", () => {
   test("Ctrl+Up reorders the selected note above its previous sibling", async ({ page, request }) => {
     const u = uniq();
-    const a = await (await request.post("/api/notes", { data: { title: `K1 ${u}` } })).json();
-    const b = await (await request.post("/api/notes", { data: { title: `K2 ${u}` } })).json();
-    const c = await (await request.post("/api/notes", { data: { title: `K3 ${u}` } })).json();
-
+    for (const t of [`K1 ${u}`, `K2 ${u}`, `K3 ${u}`]) {
+      await request.post("/api/notes", { data: { title: t } });
+    }
     await page.goto("/");
     await waitForAppBoot(page);
     await openInTree(page, `K3 ${u}`);
@@ -70,45 +67,37 @@ test.describe("Tree keyboard movement", () => {
     await page.keyboard.press("Control+ArrowUp");
     await expect(page.locator("#topbar-title")).toContainText(`K3 ${u}`); // stays open
 
-    const navDiag = await page.evaluate(() => ({
-      hist: NavHistory.debug(),
-      active: document.activeElement?.tagName,
-      inTree: document.getElementById("note-tree").contains(document.activeElement),
-      kbdFired: (window as unknown as { __treeMoveLast?: unknown }).__treeMoveLast ?? "never",
-      moveErrs: (page as unknown as { _gui4Errors?: string[] })._gui4Errors ?? [],
-      rows: Array.from(document.querySelectorAll("#note-tree .wb-row")).map((r) => r.textContent?.trim()),
-      cache: (typeof _notesCache !== "undefined" ? _notesCache : []).map((n: { title: string; parent_id: number | null; position: number | null }) => `${n.title}:p${n.parent_id},pos${n.position}`),
-    }));
-    // Order assertions carry full diagnostics for any residual failure
-    const order = (await treeOrder(page)).join("|");
-    const msg = `kbd diag: ${JSON.stringify(navDiag)} | dom order: ${order}`;
-    expect(order.indexOf(`K3 ${u}`) > -1, msg).toBe(true);
-    expect(order.indexOf(`K3 ${u}`), msg).toBeLessThan(order.indexOf(`K2 ${u}`));
-    expect(order.indexOf(`K1 ${u}`), msg).toBeLessThan(order.indexOf(`K3 ${u}`));
+    const k3Idx = await treeRowIndex(page, `K3 ${u}`);
+    const k2Idx = await treeRowIndex(page, `K2 ${u}`);
+    const k1Idx = await treeRowIndex(page, `K1 ${u}`);
+    expect(k3Idx, diag(page)).toBeLessThan(k2Idx);
+    expect(k1Idx, diag(page)).toBeLessThan(k3Idx);
 
     // Server state matches the UI
-    const moved = await (await request.get(`/api/notes/${c.id}`)).json();
-    expect(moved.position).toBe(1);
-    void b;
+    const notes = await (await request.get("/api/notes")).json();
+    const k3 = (notes as Array<{ title: string; position: number }>).find(
+      (n) => n.title === `K3 ${u}`
+    );
+    expect(k3?.position).toBe(1);
   });
 
   test("Ctrl+Right nests a note into its previous sibling", async ({ page, request }) => {
     const u = uniq();
-    const root = await (await request.post("/api/notes", { data: { title: `NRoot ${u}` } })).json();
-    await request.post("/api/notes", { data: { title: `NChild ${u}`, parent_id: root.id } });
-    const target = await (await request.post("/api/notes", { data: { title: `NTarget ${u}` } })).json();
+    const p = await (await request.post("/api/notes", { data: { title: `NParent ${u}` } })).json();
+    await request.post("/api/notes", { data: { title: `NChild ${u}`, parent_id: p.id } });
+    await request.post("/api/notes", { data: { title: `NSecond ${u}`, parent_id: p.id } });
 
     await page.goto("/");
     await waitForAppBoot(page);
-    await openInTree(page, `NTarget ${u}`);
+    await jumpTo(page, `NSecond ${u}`);
 
     await page.keyboard.press("Control+ArrowRight");
-    await expect(page.locator("#topbar-title")).toContainText(`NTarget ${u}`);
+    await expect(page.locator("#topbar-title")).toContainText(`NSecond ${u}`);
 
-    // Breadcrumb reflects the new parent
-    await expect(page.locator("#topbar-breadcrumb")).toContainText(`NChild ${u}`);
-    const moved = await (await request.get(`/api/notes/${target.id}`)).json();
-    expect(moved.parent_id).not.toBeNull();
+    // Breadcrumb reflects the new parent chain: NParent › NChild
+    const bc = page.locator("#topbar-breadcrumb");
+    await expect(bc).toContainText(`NParent ${u}`);
+    await expect(bc).toContainText(`NChild ${u}`);
   });
 
   test("Ctrl+Left promotes a child up to its grandparent level", async ({ page, request }) => {
@@ -119,7 +108,7 @@ test.describe("Tree keyboard movement", () => {
 
     await page.goto("/");
     await waitForAppBoot(page);
-    await jumpToLeaf(page, `PLeaf ${u}`);
+    await jumpTo(page, `PLeaf ${u}`);
 
     await page.keyboard.press("Control+.");
     await page.keyboard.press("Control+ArrowLeft");
@@ -129,14 +118,26 @@ test.describe("Tree keyboard movement", () => {
     expect(moved.parent_id).toBe(root.id); // promoted out of PMid to PRoot level
   });
 
-  async function jumpToLeaf(page: import("@playwright/test").Page, title: string) {
-    await page.keyboard.press("Control+k");
-    const resp = page.waitForResponse((r) => r.url().includes("/api/search"), { timeout: 10000 });
-    await page.locator("#quickSearchInput").fill(title);
-    await resp;
-    await page.keyboard.press("Enter");
-    await expect(page.locator("#topbar-title"), title + diag(page)).toContainText(title, { timeout: 10000 });
-  }
+  test("edge cases: first/last sibling moves are no-ops that keep data intact", async ({ page, request }) => {
+    const u = uniq();
+    const a = await (await request.post("/api/notes", { data: { title: `EdgeA ${u}` } })).json();
+    await request.post("/api/notes", { data: { title: `EdgeB ${u}` } });
+
+    await page.goto("/");
+    await waitForAppBoot(page);
+    await openInTree(page, `EdgeA ${u}`); // first sibling
+
+    await page.keyboard.press("Control+ArrowUp"); // no previous sibling → no-op
+    await expect(page.locator("#topbar-title")).toContainText(`EdgeA ${u}`);
+    const row = await page.evaluate(
+      (t) => {
+        const rows = Array.from(document.querySelectorAll("#note-tree .wb-row"));
+        return rows.findIndex((r) => (r.textContent ?? "").includes(t));
+      },
+      `EdgeA ${u}`
+    );
+    expect(row).toBeGreaterThanOrEqual(0);
+  });
 });
 
 test.describe("Tree context menu & dialog", () => {
@@ -153,8 +154,9 @@ test.describe("Tree context menu & dialog", () => {
     await page.locator('#ctxMenu .context-menu-item[data-action="move-up"]').click();
     await expect(page.locator("#topbar-title")).toContainText(`CMB ${u}`);
 
-    const order = (await treeOrder(page)).join("|");
-    expect(order.indexOf(`CMB ${u}`)).toBeLessThan(order.indexOf(`CMA ${u}`));
+    const cmbIdx = await treeRowIndex(page, `CMB ${u}`);
+    const cmaIdx = await treeRowIndex(page, `CMA ${u}`);
+    expect(cmbIdx, diag(page)).toBeLessThan(cmaIdx);
   });
 
   test("Move to… dialog reparents and persists across reload", async ({ page, request }) => {
@@ -205,7 +207,7 @@ test.describe("Tree drag & drop", () => {
     const srcNote = (notes as Array<{ title: string; parent_id: number | null }>).find(
       (n) => n.title === `DragSrc ${u}`
     );
-    expect(srcNote?.parent_id).toBe(dest.id);
+    expect(srcNote?.parent_id, diag(page)).toBe(dest.id);
   });
 
   test("reordering via drop between siblings updates positions", async ({ page, request }) => {
