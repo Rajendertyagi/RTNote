@@ -268,7 +268,7 @@
   }
   .topbar__app-actions select { height: 28px; font-size: 11px; }
   .note-menu-wrap { position: relative; display: inline-flex; }
-  .note-menu { display: none; } /* opens via .open, like the context menu */
+  .note-menu { position: absolute; top: 100%; right: 0; margin-top: 4px; }
   .status-bar .st-dirty { color: var(--text-1); font-weight: 600; }
   .status-bar .st-saving { color: var(--text-3); font-style: italic; }
   .status-bar .st-saved { color: var(--text-3); }

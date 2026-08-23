@@ -175,10 +175,8 @@ function initNoteMenu() {
 
     btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const r = btn.getBoundingClientRect();
-        // Open leftward-aligned under the button, clamped to the window
-        menu.style.left = Math.max(8, r.right - menu.offsetWidth) + 'px';
-        menu.style.top = (r.bottom + 4) + 'px';
+        // Anchored via CSS (.note-menu { position:absolute; right:0 }) inside
+        // .note-menu-wrap — no offsetWidth math (it reads 0 while hidden).
         menu.classList.toggle('open');
     });
 
