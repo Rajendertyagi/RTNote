@@ -48,7 +48,11 @@ async def get_day_note(date_str: str):
 
         year = _find_child(conn, journal["id"], year_title) or _create(conn, year_title, journal["id"])
         month = _find_child(conn, year["id"], month_title) or _create(conn, month_title, year["id"])
-        day = _find_child(conn, month["id"], date_str) or _create(conn, date_str, month["id"])
+
+        day = _find_child(conn, month["id"], date_str)
+        created_now = day is None
+        if created_now:
+            day = _create(conn, date_str, month["id"])
 
         return {
             "id": day["id"],
@@ -56,5 +60,5 @@ async def get_day_note(date_str: str):
             "content": day["content"],
             "parent_id": day["parent_id"],
             "type": day["type"],
-            "created": day["created_at"] == day["updated_at"],
+            "created": created_now,
         }

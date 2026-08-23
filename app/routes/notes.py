@@ -96,15 +96,13 @@ async def duplicate_note(note_id: int):
         id_map: dict[int, int] = {}
 
         def copy_row(row, new_parent):
+            # '(copy)' suffix marks duplicated top-level notes only; nested
+            # copies keep their titles (they're disambiguated by position).
+            is_dup_root = row["id"] == note_id
+            new_title = row["title"] + " (copy)" if (is_dup_root and root["parent_id"] is None) else row["title"]
             cur = conn.execute(
                 "INSERT INTO notes (title, content, parent_id, type, mime) VALUES (?, ?, ?, ?, ?)",
-                (
-                    row["title"] + " (copy)" if row["id"] == note_id else row["title"],
-                    row["content"],
-                    new_parent,
-                    row["type"],
-                    row["mime"],
-                ),
+                (new_title, row["content"], new_parent, row["type"], row["mime"]),
             )
             id_map[row["id"]] = cur.lastrowid
             children = conn.execute(
@@ -168,7 +166,7 @@ async def delete_note(note_id: int):
 
         ids = _subtree_ids(conn, note_id)
         delete_id = secrets.token_hex(8)
-        now = datetime.utcnow().isoformat(timespec="seconds")
+        now = datetime.now().isoformat(timespec="seconds")
         placeholders = ",".join("?" * len(ids))
         conn.execute(
             f"UPDATE notes SET deleted_at=?, delete_id=? WHERE id IN ({placeholders})",
@@ -180,18 +178,20 @@ async def delete_note(note_id: int):
 
 @router.get("/search")
 async def search_notes(q: str):
-    """FTS5 full-text search; returns id, title, snippet and tree path."""
+    """FTS5 full-text search; returns id, title, match-centered snippet and path."""
     with db() as conn:
         try:
             rows = conn.execute(
-                "SELECT notes.id, notes.title, notes.content FROM notes_fts "
+                "SELECT notes.id, notes.title, notes.content,"
+                "       snippet(notes_fts, -1, '', '', '...', 12) AS snip "
+                "FROM notes_fts "
                 "JOIN notes ON notes.id = notes_fts.rowid "
                 "WHERE notes_fts MATCH ? AND notes.deleted_at IS NULL",
                 (q,),
             ).fetchall()
         except Exception:
             rows = conn.execute(
-                "SELECT id, title, content FROM notes "
+                "SELECT id, title, content, NULL AS snip FROM notes "
                 "WHERE deleted_at IS NULL AND (title LIKE ? OR content LIKE ?)",
                 (f"%{q}%", f"%{q}%"),
             ).fetchall()
@@ -211,8 +211,11 @@ async def search_notes(q: str):
                 nid = n["parent_id"]
             path_parts.reverse()
 
-            content = r["content"] or ""
-            snippet = content[:150] + ("..." if len(content) > 150 else "")
+            if r["snip"]:
+                snippet = r["snip"]
+            else:
+                content = r["content"] or ""
+                snippet = content[:150] + ("..." if len(content) > 150 else "")
             results.append({"id": r["id"], "title": r["title"], "snippet": snippet, "path": " > ".join(path_parts)})
 
     return results

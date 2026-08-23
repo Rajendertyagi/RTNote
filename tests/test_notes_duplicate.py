@@ -17,14 +17,15 @@ async def test_duplicate_copies_subtree_with_suffix_on_root(client):
     assert copy["title"] == "Root (copy)"
     assert copy["id"] != root["id"]
 
-    listed = {n["title"]: n for n in (await client.get("/api/notes")).json()}
+    all_notes = (await client.get("/api/notes")).json()
+    assert len(all_notes) == 6  # 3 original + 3 copies
+    listed = {n["title"]: n for n in all_notes}
     copy_child = next(n for t, n in listed.items() if t == "Child" and n["id"] != child["id"])
     copy_gc = next(n for t, n in listed.items() if t == "GC" and n["id"] != grandchild["id"])
     assert copy_child["parent_id"] == copy["id"]
     assert copy_gc["parent_id"] == copy_child["id"]
     # originals untouched
     assert listed["Root"]["id"] == root["id"]
-    assert len(listed) == 6  # 3 original + 3 copies
 
 
 async def test_duplicate_leaf_gets_suffix_and_same_parent(client):

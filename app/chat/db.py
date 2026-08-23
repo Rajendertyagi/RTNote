@@ -64,13 +64,16 @@ async def init_db():
         
         await conn.execute(text("""
             CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
-                DELETE FROM memories_fts WHERE rowid = old.id;
+                INSERT INTO memories_fts(memories_fts, rowid, memory_text)
+                    VALUES('delete', old.id, old.memory_text);
             END;
         """))
-        
+
         await conn.execute(text("""
             CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
-                UPDATE memories_fts SET memory_text=new.memory_text WHERE rowid=new.id;
+                INSERT INTO memories_fts(memories_fts, rowid, memory_text)
+                    VALUES('delete', old.id, old.memory_text);
+                INSERT INTO memories_fts(rowid, memory_text) VALUES (new.id, new.memory_text);
             END;
         """))
 

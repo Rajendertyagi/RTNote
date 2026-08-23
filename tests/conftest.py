@@ -44,9 +44,13 @@ async def client():
 
 
 # ---------- Chat DB ----------
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(autouse=True)
 async def chat_db():
-    """Fresh chat DB (SQLAlchemy models + FTS table/triggers) per test."""
+    """Fresh chat DB (SQLAlchemy models + FTS table/triggers) per test.
+
+    Autouse: without it, sessions/memories created by chat-send tests leak
+    into later tests (list_sessions_empty etc. saw leftover rows).
+    """
     await dispose_engine()
     path = NOTES_DB_PATH.parent / "chat.db"
     if path.exists():
@@ -84,7 +88,13 @@ def fake_llm(monkeypatch):
         queue = list(responses)
 
         async def _fake_acompletion(**kwargs):
-            calls.append(kwargs)
+            # Deep-copy messages: the manager keeps mutating its list after
+            # the call (appends the assistant reply), which would otherwise
+            # retroactively change what we recorded.
+            calls.append({
+                **kwargs,
+                "messages": [dict(m) for m in kwargs.get("messages", [])],
+            })
             content = queue.pop(0) if queue else "ok"
             return FakeLLMResponse(content)
 

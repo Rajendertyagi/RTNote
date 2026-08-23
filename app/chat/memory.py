@@ -296,8 +296,10 @@ class MemoryManager:
         if not tokens:
             return []
 
-        # Properly quote each token for FTS5
-        match_expr = " AND ".join(quote_fts_token(t) for t in tokens)
+        # Properly quote each token for FTS5; OR-semantics so a message
+        # sharing ANY token with a memory recalls it (bm25 ranks multi-token
+        # matches higher). AND here was too strict and recalled nothing.
+        match_expr = " OR ".join(quote_fts_token(t) for t in tokens)
 
         sql = text(
             """

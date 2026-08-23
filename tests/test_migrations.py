@@ -49,7 +49,10 @@ def test_fts_triggers_recreated_and_index_works(notes_db):
         assert {"notes_ai", "notes_ad", "notes_au"} <= triggers
         conn.execute("INSERT INTO notes (title, content) VALUES ('Alpha', 'searchable-xyz')")
         conn.commit()
-        hits = conn.execute("SELECT rowid FROM notes_fts WHERE notes_fts MATCH 'searchable-xyz'").fetchall()
+        # 'searchable-xyz' must be quoted: bare hyphen is invalid FTS5 query syntax
+        hits = conn.execute(
+            "SELECT rowid FROM notes_fts WHERE notes_fts MATCH '\"searchable-xyz\"'"
+        ).fetchall()
         assert len(hits) == 1
     finally:
         conn.close()

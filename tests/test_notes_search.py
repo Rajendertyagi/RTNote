@@ -22,7 +22,9 @@ async def test_fts_match_returns_snippet_and_path(client):
     assert hit["id"] == note["id"]
     assert hit["title"] == "Quantum Notes"
     assert "entanglement" in hit["snippet"]
-    assert hit["snippet"].endswith("...")
+    # Long content must show an omission marker where text was cut —
+    # here the match sits at the end, so the cut is at the start.
+    assert hit["snippet"].startswith("...") or hit["snippet"].endswith("...")
     assert hit["path"] == "Projects > Quantum Notes"
 
 

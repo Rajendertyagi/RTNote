@@ -4,6 +4,8 @@ Trilium equivalent (routes/api/attachments.ts): images return a URL the
 editor embeds directly as <img src>; other files are downloadable. We serve
 inline for known image mimes, attachment-disposition otherwise.
 """
+from urllib.parse import unquote
+
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import Response
 
@@ -47,7 +49,9 @@ async def upload_attachment(note_id: int, file: UploadFile):
             raise HTTPException(status_code=404, detail="Note not found")
 
         mime = file.content_type or "application/octet-stream"
-        filename = file.filename or "unnamed"
+        # Browsers/HTTP clients percent-encode special characters in filenames
+        # (e.g. '"' -> %22); decode so the stored name is human-readable.
+        filename = unquote(file.filename or "unnamed")
         cur = conn.execute(
             "INSERT INTO attachments (note_id, filename, mime, size, content) VALUES (?, ?, ?, ?, ?)",
             (note_id, filename, mime, len(data), data),

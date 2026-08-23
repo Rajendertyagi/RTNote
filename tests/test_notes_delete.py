@@ -34,9 +34,11 @@ async def test_delete_removes_bookmarks_of_subtree(client):
 
 
 async def test_deleted_note_hidden_from_list_but_fetchable(client):
-    root, *_ = await _make_tree(client)
+    root, a, b, other = await _make_tree(client)
     await client.delete(f"/api/notes/{root['id']}")
-    assert (await client.get("/api/notes")).json() == []
+    # The deleted subtree vanishes from the list; unrelated notes remain.
+    listed = (await client.get("/api/notes")).json()
+    assert [n["id"] for n in listed] == [other["id"]]
     body = (await client.get(f"/api/notes/{root['id']}")).json()
     assert body["deleted_at"] is not None
 
