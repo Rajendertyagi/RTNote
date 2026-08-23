@@ -70,6 +70,14 @@ function revealNoteInTree(noteId) {
     if (!node) return;
     _treeReloadGuard = true; // programmatic selection must not re-open the note
     try {
+        // Expand ancestors first — a collapsed node has no row to select.
+        if (typeof node.getParentList === 'function') {
+            node.getParentList(false).forEach((p) => {
+                if (typeof p.setExpanded === 'function') {
+                    try { p.setExpanded(true); } catch (err) { /* ignore */ }
+                }
+            });
+        }
         if (typeof node.reveal === 'function') node.reveal();
         if (typeof node.setSelected === 'function') node.setSelected(true);
     } catch (e) { /* older builds: best effort */ }
@@ -142,7 +150,9 @@ async function initTree() {
         activate: (e) => {
             // Ignore programmatic activations (tree reload restores the active
             // node and re-fires this) — only respond to real user clicks/keys.
-            if (!e.event || _treeReloadGuard) return;
+            // Wunderbaum exposes the originating UI event as `originalEvent`.
+            const ev = e.originalEvent || e.event;
+            if (!ev || _treeReloadGuard) return;
             const id = parseInt(e.node.key, 10);
             if (!isNaN(id)) openNoteInTab(id);
         },

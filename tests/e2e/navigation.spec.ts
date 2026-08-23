@@ -95,7 +95,11 @@ test.describe("Breadcrumbs", () => {
     await bc.locator(".crumb", { hasText: "Crumb Mid" }).click();
     await expect(page.locator("#topbar-title")).toContainText("Crumb Mid");
 
+    // Ensure the crumb's async open chain fully settled before jumping again
+    await page.waitForFunction(() => App.bootDone === true);
+
     await jumpTo(page, "Crumb Leaf");
+    await expect(page.locator("#topbar-title")).toContainText("Crumb Leaf");
     await bc.locator(".crumb", { hasText: "Crumb Root" }).click();
     await expect(page.locator("#topbar-title")).toContainText("Crumb Root");
 
