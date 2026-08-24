@@ -810,6 +810,16 @@
     padding: 6px 8px;
     border-bottom: 1px solid var(--border, #333);
 }
+/* .qs-action's absolute positioning was designed for ONE pinned button
+   inside the search box. In the mini toolbar these are normal flex
+   siblings — absolute made all three stack on top of each other, so the
+   expand link silently swallowed clicks meant for the memories/attach
+   buttons. */
+.chat-mini-toolbar .qs-action {
+    position: static;
+    transform: none;
+    opacity: 1;
+}
 .chat-mini-toolbar select {
     flex: 1;
     min-width: 0;
