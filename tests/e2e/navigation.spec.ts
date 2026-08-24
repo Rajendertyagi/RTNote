@@ -43,6 +43,13 @@ test.describe("Navigation history", () => {
     await page.goto("/");
     await waitForAppBoot(page);
 
+    // Isolation: a previous spec's persisted tabs would restore at boot and
+    // record one history entry ahead of Alpha. Start from a clean slate so
+    // Alpha is provably the oldest entry.
+    await request.put("/api/options/open-tabs", { data: { value: "" } });
+    await page.reload();
+    await waitForAppBoot(page);
+
     await openFromTree(page, `Alpha ${u}`);
     await jumpTo(page, `Bravo ${u}`);
     await jumpTo(page, `Delta ${u}`);

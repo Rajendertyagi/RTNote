@@ -118,6 +118,7 @@ const Outline = (() => {
       const nodes = editorRoot.querySelectorAll("h1, h2, h3");
       if (!nodes || idx < 0 || idx >= nodes.length) return;
       nodes[idx].scrollIntoView({ block: "start" });
+      editorRoot.focus(); // keystrokes land in the note after a jump
       nodes[idx].classList.add("outline-flash");
       setTimeout(function () {
         try { nodes[idx].classList.remove("outline-flash"); } catch (e2) {}

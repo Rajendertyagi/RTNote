@@ -177,7 +177,7 @@ test.describe("GUI-5 sidebar", () => {
     await expect(composer).toBeVisible();
     await composer.fill("still here");
     await expect(composer).toHaveValue("still here");
-    await expect(page.getByTestId("mini-chat-stream")).toBeInTheDocument();
+    await expect(page.getByTestId("mini-chat-stream")).toBeVisible();
 
     await page.locator("#memoriesToggleMini").click();
     await expect(page.locator("#memories-strip")).toBeVisible();
